@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Draft 2 — Design Space</title>
+<title>256 — Design Space</title>
 <style>
   :root{
-    --bg:#eeece6; --panel:#e4e1d8; --fg:#14140f; --dim:#8a8878;
-    --line:#c9c5b8; --hot:#d9330a; --gap:#b9241f;
+    --bg:#efece4; --panel:#e5e1d6; --fg:#15150f; --dim:#84806f;
+    --line:#c9c4b4; --hot:#d9330a; --gap:#b3241f; --ok:#1d7a4c;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
@@ -15,255 +15,237 @@
   body{background:var(--bg);color:var(--fg);font-family:var(--mono);
        font-size:11px;letter-spacing:.04em;overflow:hidden}
 
-  /* ---------- top bar ---------- */
-  #bar{position:fixed;top:0;left:0;right:0;height:52px;z-index:30;
-       border-bottom:1px solid var(--line);background:var(--panel);
-       display:flex;align-items:center;gap:26px;padding:0 20px}
-  .brand{font-size:10px;letter-spacing:.2em;line-height:1.5}
+  #bar{position:fixed;top:0;left:0;right:0;height:56px;z-index:40;
+    border-bottom:1px solid var(--line);background:var(--panel);
+    display:flex;align-items:center;gap:22px;padding:0 18px}
+  .brand{font-size:10px;letter-spacing:.19em;line-height:1.55}
   .brand i{font-style:normal;color:var(--dim);display:block;font-size:8px}
-
-  .sel{display:flex;align-items:center;gap:7px}
-  .sel label{font-size:8px;color:var(--dim);letter-spacing:.16em}
-  select{font:inherit;font-size:10px;letter-spacing:.1em;background:var(--bg);
-    color:var(--fg);border:1px solid var(--line);padding:4px 8px;border-radius:0;
-    cursor:pointer;text-transform:uppercase}
+  .sel{display:flex;align-items:center;gap:6px}
+  .sel label{font-size:8px;color:var(--dim);letter-spacing:.15em}
+  select{font:inherit;font-size:10px;letter-spacing:.09em;background:var(--bg);color:var(--fg);
+    border:1px solid var(--line);padding:4px 7px;cursor:pointer;text-transform:uppercase}
   select:hover{border-color:var(--fg)}
-  .swapbtn{border:1px solid var(--line);background:var(--bg);color:var(--dim);
-    padding:5px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:.1em}
-  .swapbtn:hover{border-color:var(--fg);color:var(--fg)}
-
+  .btn{border:1px solid var(--line);background:var(--bg);color:var(--dim);padding:5px 9px;
+    cursor:pointer;font:inherit;font-size:9px;letter-spacing:.11em}
+  .btn:hover{border-color:var(--fg);color:var(--fg)}
+  .btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
   .chips{display:flex;gap:1px;margin-left:auto}
-  .chip{padding:5px 9px;border:1px solid var(--line);color:var(--dim);
-    cursor:pointer;font-size:9px;letter-spacing:.12em;user-select:none;background:var(--bg)}
-  .chip:hover{color:var(--fg)}
-  .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 
-  /* ---------- plot ---------- */
-  #plot{position:fixed;top:52px;left:0;right:264px;bottom:0;overflow:hidden}
+  #plot{position:fixed;top:56px;left:0;right:290px;bottom:0;overflow:hidden}
   #grid{position:absolute;inset:0}
   .cell{position:absolute;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
   .cell.empty{background:repeating-linear-gradient(45deg,transparent,transparent 5px,
-    rgba(185,36,31,.07) 5px,rgba(185,36,31,.07) 6px)}
+    rgba(179,36,31,.075) 5px,rgba(179,36,31,.075) 6px)}
   .cell.empty.flag{outline:1px dashed var(--gap);outline-offset:-2px}
-  .cell .n{position:absolute;right:3px;bottom:2px;font-size:8px;color:var(--dim);opacity:.7}
-  .cell.hover{background:rgba(217,51,10,.07)}
-
+  .cell .n{position:absolute;right:3px;bottom:2px;font-size:8px;color:var(--dim)}
+  .cell.hi{background:rgba(217,51,10,.08)}
   .tile{position:absolute;overflow:hidden;cursor:pointer;
-    transition:transform .55s cubic-bezier(.22,.9,.24,1),left .55s,top .55s,
-               width .55s,height .55s,opacity .3s,box-shadow .2s}
-  .tile img{display:block;width:100%;height:100%;object-fit:cover;
-    border:.5px solid rgba(0,0,0,.22)}
-  .tile.ph img{opacity:.42;filter:grayscale(.7)}
-  .tile.hot{z-index:500;transform:scale(2.9);box-shadow:0 8px 30px rgba(0,0,0,.4)}
-  .tile.hot img{border:1px solid var(--hot);opacity:1;filter:none}
-  .tile.mute{opacity:.13}
+    transition:transform .45s cubic-bezier(.22,.9,.24,1),opacity .3s,box-shadow .18s}
+  .tile img{display:block;width:100%;height:100%;object-fit:cover;background:#d5d1c6}
+  .tile.hot{z-index:600;transform:scale(3.4);box-shadow:0 10px 34px rgba(0,0,0,.45)}
+  .tile.mute{opacity:.12}
+  .blob{position:absolute;pointer-events:none;transition:.45s}
+  .bn{position:absolute;font-size:9px;color:var(--fg);pointer-events:none}
+  .xl,.yl{position:absolute;font-size:9px;letter-spacing:.11em;color:var(--dim);
+    text-transform:uppercase;pointer-events:none;overflow:hidden;white-space:nowrap}
+  .xl{bottom:5px;text-align:center}
+  .axn{position:absolute;font-size:9px;letter-spacing:.19em;color:var(--fg)}
+  #axX{bottom:5px;right:12px}#axY{top:10px;left:8px}
 
-  /* density mode */
-  .blob{position:absolute;background:var(--fg);transition:.5s;pointer-events:none}
-  .blobn{position:absolute;font-size:9px;color:var(--fg);pointer-events:none}
-
-  /* ---------- axis labels ---------- */
-  .xl,.yl{position:absolute;font-size:9px;letter-spacing:.12em;color:var(--dim);
-    text-transform:uppercase;pointer-events:none}
-  .xl{bottom:6px;text-align:center}
-  .yl{left:7px;transform-origin:left center}
-  .axname{position:absolute;font-size:9px;letter-spacing:.2em;color:var(--fg)}
-  #axX{bottom:6px;right:14px}
-  #axY{top:12px;left:10px}
-
-  /* ---------- side ---------- */
-  #side{position:fixed;top:52px;right:0;bottom:0;width:264px;z-index:20;
-    border-left:1px solid var(--line);background:var(--panel);padding:16px;
+  #side{position:fixed;top:56px;right:0;bottom:0;width:290px;z-index:30;
+    border-left:1px solid var(--line);background:var(--panel);padding:15px;
     display:flex;flex-direction:column}
-  #prev{width:100%;aspect-ratio:16/10;background:#d5d1c6;border:1px solid var(--line);
-    margin-bottom:12px;overflow:hidden}
+  #prev{width:100%;aspect-ratio:16/10;background:#d8d4c8;border:1px solid var(--line);
+    margin-bottom:11px;overflow:hidden}
   #prev img{width:100%;height:100%;object-fit:cover;display:block}
-  #meta{font-size:9px;line-height:1.85;color:var(--dim);flex:1;overflow:auto}
-  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.09em;display:block;margin-bottom:9px}
-  #meta .row{display:flex;justify-content:space-between;gap:10px;
-    border-bottom:1px solid rgba(0,0,0,.06);padding:2px 0}
+  #meta{font-size:9px;line-height:1.8;color:var(--dim);overflow:auto;flex:1}
+  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.08em;display:block;margin-bottom:8px;line-height:1.5}
+  #meta .row{display:flex;justify-content:space-between;gap:8px;
+    border-bottom:1px solid rgba(0,0,0,.055);padding:2px 0}
   #meta .row b{color:var(--fg);font-weight:400}
-  #meta .flag{color:var(--hot);display:block;margin-bottom:6px;font-size:9px}
-  #stats{border-top:1px solid var(--line);padding-top:10px;margin-top:10px;
-    font-size:9px;color:var(--dim);line-height:1.8}
-  #stats b{color:var(--fg);font-weight:400}
-  #stats .gapline{color:var(--gap)}
+  #meta .sw{display:inline-block;width:9px;height:9px;vertical-align:-1px;margin-left:4px;
+    border:1px solid rgba(0,0,0,.25)}
+  #verdict{border-top:2px solid var(--fg);margin-top:11px;padding-top:11px;font-size:9px;line-height:1.75}
+  #verdict .v{font-size:23px;letter-spacing:.04em;display:block;margin:3px 0 5px}
+  #verdict .lead{color:var(--fg);letter-spacing:.13em;font-size:8px}
+  #verdict p{margin:7px 0 0;color:var(--dim);line-height:1.85}
+  .good{color:var(--ok)}.bad{color:var(--gap)}
 </style>
 </head>
 <body>
 
 <div id="bar">
-  <div class="brand">256 / DRAFT 02<i>DESIGN SPACE — PLOT ANY FIELD AGAINST ANY OTHER</i></div>
-  <div class="sel"><label>Y</label><select id="ySel"></select></div>
-  <button class="swapbtn" id="swap">⇄ SWAP</button>
-  <div class="sel"><label>X</label><select id="xSel"></select></div>
-  <div class="chips" id="chips"></div>
+  <div class="brand">256 / DRAFT 02<i>DESIGN SPACE — WHICH TWO FIELDS ACTUALLY MAKE A PLANE?</i></div>
+  <div class="sel"><label>Y</label><select id="yS"></select></div>
+  <button class="btn" id="swap">⇄</button>
+  <div class="sel"><label>X</label><select id="xS"></select></div>
+  <div class="chips">
+    <button class="btn" id="bDen">DENSITY</button>
+    <button class="btn on" id="bGap">FLAG GAPS</button>
+    <button class="btn" id="bWorld">REAL-WORLD ONLY</button>
+    <button class="btn" id="bAnim">ANIMATED ONLY</button>
+  </div>
 </div>
 
-<div id="plot">
-  <div id="grid"></div>
-  <div class="axname" id="axX"></div>
-  <div class="axname" id="axY"></div>
-</div>
+<div id="plot"><div id="grid"></div>
+  <div class="axn" id="axX"></div><div class="axn" id="axY"></div></div>
 
 <div id="side">
   <div id="prev"></div>
   <div id="meta"></div>
-  <div id="stats"></div>
+  <div id="verdict"></div>
 </div>
 
 <script src="../assets/data.js"></script>
 <script>
 /* ------------------------------------------------------------------
-   Every item has 11 categorical fields. Any two of them make a plane.
-   The empty cells are the argument: they are the layouts nobody built.
+   Any two fields make a plane — but most pairs are a lie, because the
+   fields are not independent. Cramér's V measures that association,
+   so the choice of axes stops being taste and becomes a measurement.
 ------------------------------------------------------------------ */
 
-const PLOTTABLE = ['geometry','orderedBy','navigation','dimension','medium',
-                   'density','structure','effort','ground','field','register'];
+const HUE=h=>h<20||h>=330?'red':h<45?'orange':h<70?'yellow':h<160?'green':
+             h<200?'cyan':h<255?'blue':h<330?'purple':'red';
+const AXES={
+  spectrum:{label:'Band (order→chaos)', vals:META.bands, of:d=>d.spectrum},
+  meaning :{label:'Meaning',            vals:META.meanings, of:d=>d.meaning},
+  category:{label:'Subject',            vals:META.categories, of:d=>d.category},
+  decile  :{label:'Rank decile',        vals:[...Array(10)].map((_,i)=>`${i*10}–${i*10+10}%`),
+            of:d=>{const t=(d.rank-RMIN)/(RMAX-RMIN);return `${Math.min(9,Math.floor(t*10))*10}–${Math.min(9,Math.floor(t*10))*10+10}%`}},
+  hue     :{label:'Hue family',         vals:['red','orange','yellow','green','cyan','blue','purple'], of:d=>HUE(d.h)},
+  light   :{label:'Lightness',          vals:['very dark','dark','mid','light'],
+            of:d=>d.l<22?'very dark':d.l<42?'dark':d.l<64?'mid':'light'},
+  sat     :{label:'Saturation',         vals:['grey','muted','saturated'],
+            of:d=>d.s<14?'grey':d.s<42?'muted':'saturated'},
+  world   :{label:'Register',           vals:['real-world','graphic'], of:d=>d.world?'real-world':'graphic'},
+  motion  :{label:'Motion',             vals:['still','animated'], of:d=>d.animated?'animated':'still'},
+};
+const RANKS=DATA.map(d=>d.rank), RMIN=Math.min(...RANKS), RMAX=Math.max(...RANKS);
+const BANDC={order:'#2f6fb0',inhabited:'#c39320',pressure:'#c0341a'};
 
-let xKey='dimension', yKey='geometry';
-let mode='tiles';           /* tiles | density */
-let flagGaps=true;
-let registerFilter=null;
-
+let xK='world', yK='spectrum', density=false, gaps=true, onlyWorld=false, onlyAnim=false;
 const grid=document.getElementById('grid');
 
-/* ---------- controls ---------- */
-const opts = k => PLOTTABLE.map(f=>
-  `<option value="${f}" ${f===k?'selected':''}>${FIELD_LABELS[f]}</option>`).join('');
-document.getElementById('xSel').innerHTML=opts(xKey);
-document.getElementById('ySel').innerHTML=opts(yKey);
-document.getElementById('xSel').onchange=e=>{xKey=e.target.value;render();};
-document.getElementById('ySel').onchange=e=>{yKey=e.target.value;render();};
-document.getElementById('swap').onclick=()=>{
-  [xKey,yKey]=[yKey,xKey];
-  document.getElementById('xSel').value=xKey;
-  document.getElementById('ySel').value=yKey;
-  render();
-};
+const opt=k=>Object.keys(AXES).map(f=>
+  `<option value="${f}" ${f===k?'selected':''}>${AXES[f].label}</option>`).join('');
+xS.innerHTML=opt(xK); yS.innerHTML=opt(yK);
+xS.onchange=e=>{xK=e.target.value;render()};
+yS.onchange=e=>{yK=e.target.value;render()};
+swap.onclick=()=>{[xK,yK]=[yK,xK];xS.value=xK;yS.value=yK;render()};
+const t=(el,fn)=>{el.onclick=()=>{el.classList.toggle('on');fn(el.classList.contains('on'));render()}};
+t(bDen,v=>density=v); t(bGap,v=>gaps=v); t(bWorld,v=>onlyWorld=v); t(bAnim,v=>onlyAnim=v);
 
-const CHIPS=[
-  {id:'density', label:'DENSITY VIEW'},
-  {id:'gaps',    label:'FLAG GAPS'},
-  ...FIELDS.register.map(r=>({id:'reg:'+r, label:r.toUpperCase()})),
-];
-document.getElementById('chips').innerHTML=CHIPS.map(c=>
-  `<div class="chip${c.id==='gaps'?' on':''}" data-id="${c.id}">${c.label}</div>`).join('');
-document.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
-  const id=ch.dataset.id;
-  if(id==='density'){ mode = mode==='tiles'?'density':'tiles'; ch.classList.toggle('on'); }
-  else if(id==='gaps'){ flagGaps=!flagGaps; ch.classList.toggle('on'); }
-  else{
-    const r=id.slice(4);
-    registerFilter = registerFilter===r ? null : r;
-    document.querySelectorAll('.chip[data-id^="reg:"]').forEach(c=>
-      c.classList.toggle('on', c.dataset.id==='reg:'+registerFilter));
-  }
-  render();
-});
+const active=()=>DATA.filter(d=>(!onlyWorld||d.world)&&(!onlyAnim||d.animated));
 
-/* ---------- render ---------- */
-function render(){
-  const W=grid.clientWidth, H=grid.clientHeight;
-  const PAD={l:96,r:16,t:16,b:38};
-  const xs=FIELDS[xKey], ys=FIELDS[yKey];
-  const cw=(W-PAD.l-PAD.r)/xs.length;
-  const ch=(H-PAD.t-PAD.b)/ys.length;
-
-  let html='';
-
-  /* cells */
-  let filled=0, empties=[];
-  ys.forEach((yv,r)=>xs.forEach((xv,c)=>{
-    const items=DATA.filter(d=>d[xKey]===xv&&d[yKey]===yv);
-    const n=items.length;
-    if(n) filled++; else empties.push(`${xv} × ${yv}`);
-    html+=`<div class="cell ${n?'':'empty'} ${(!n&&flagGaps)?'flag':''}"
-      style="left:${PAD.l+c*cw}px;top:${PAD.t+r*ch}px;width:${cw}px;height:${ch}px"
-      data-x="${xv}" data-y="${yv}">${n?`<span class="n">${n}</span>`:''}</div>`;
+/* Cramér's V — 0 independent, 1 fully redundant */
+function cramersV(rows,xa,ya){
+  const xs=xa.vals, ys=ya.vals, n=rows.length;
+  if(!n) return 0;
+  const obs={}, rx={}, ry={};
+  rows.forEach(d=>{
+    const a=xa.of(d), b=ya.of(d);
+    obs[a+'|'+b]=(obs[a+'|'+b]||0)+1; rx[a]=(rx[a]||0)+1; ry[b]=(ry[b]||0)+1;
+  });
+  let chi=0;
+  xs.forEach(a=>ys.forEach(b=>{
+    const e=((rx[a]||0)*(ry[b]||0))/n;
+    if(e>0){const o=obs[a+'|'+b]||0; chi+=(o-e)*(o-e)/e;}
   }));
+  const k=Math.min(xs.length,ys.length)-1;
+  return k>0?Math.min(1,Math.sqrt((chi/n)/k)):0;
+}
 
-  /* axis labels */
-  xs.forEach((xv,c)=>
-    html+=`<div class="xl" style="left:${PAD.l+c*cw}px;width:${cw}px">${xv}</div>`);
-  ys.forEach((yv,r)=>
-    html+=`<div class="yl" style="top:${PAD.t+r*ch+ch/2-5}px">${yv}</div>`);
+function render(){
+  const W=grid.clientWidth,H=grid.clientHeight,P={l:104,r:14,t:14,b:34};
+  const xa=AXES[xK], ya=AXES[yK], xs=xa.vals, ys=ya.vals;
+  const cw=(W-P.l-P.r)/xs.length, ch=(H-P.t-P.b)/ys.length;
+  const rows=active();
+  let html='', filled=0;
 
-  /* content */
   ys.forEach((yv,r)=>xs.forEach((xv,c)=>{
-    const items=DATA.filter(d=>d[xKey]===xv&&d[yKey]===yv);
-    if(!items.length) return;
-    const x0=PAD.l+c*cw, y0=PAD.t+r*ch;
+    const its=rows.filter(d=>xa.of(d)===xv&&ya.of(d)===yv);
+    if(its.length) filled++;
+    html+=`<div class="cell ${its.length?'':'empty'} ${(!its.length&&gaps)?'flag':''}"
+      style="left:${P.l+c*cw}px;top:${P.t+r*ch}px;width:${cw}px;height:${ch}px"
+      data-x="${xv}" data-y="${yv}">${its.length?`<span class="n">${its.length}</span>`:''}</div>`;
+  }));
+  xs.forEach((xv,c)=>html+=`<div class="xl" style="left:${P.l+c*cw}px;width:${cw}px">${xv}</div>`);
+  ys.forEach((yv,r)=>html+=`<div class="yl" style="left:6px;top:${P.t+r*ch+ch/2-5}px;width:94px">${yv}</div>`);
 
-    if(mode==='density'){
-      const a=Math.min(1,items.length/8);
-      const size=Math.min(cw,ch)*0.72*Math.sqrt(a);
-      html+=`<div class="blob" style="left:${x0+cw/2-size/2}px;top:${y0+ch/2-size/2}px;
-        width:${size}px;height:${size}px;opacity:${0.22+a*0.6}"></div>`;
-      html+=`<div class="blobn" style="left:${x0+cw/2-6}px;top:${y0+ch/2+size/2+3}px">${items.length}</div>`;
+  ys.forEach((yv,r)=>xs.forEach((xv,c)=>{
+    const its=rows.filter(d=>xa.of(d)===xv&&ya.of(d)===yv);
+    if(!its.length) return;
+    const x0=P.l+c*cw, y0=P.t+r*ch;
+    if(density){
+      const a=Math.min(1,its.length/26), sz=Math.min(cw,ch)*0.78*Math.sqrt(a);
+      html+=`<div class="blob" style="left:${x0+cw/2-sz/2}px;top:${y0+ch/2-sz/2}px;
+        width:${sz}px;height:${sz}px;background:${BANDC[yv]||BANDC[xv]||'#15150f'};
+        opacity:${0.28+a*0.62}"></div>
+        <div class="bn" style="left:${x0+cw/2-7}px;top:${y0+ch/2+sz/2+2}px">${its.length}</div>`;
       return;
     }
-
-    /* pack the cell with a mini grid */
-    const cols=Math.ceil(Math.sqrt(items.length*1.5));
-    const rows=Math.ceil(items.length/cols);
-    const pad=3;
-    const tw=(cw-pad*2)/cols, th=Math.min((ch-pad*2)/rows, tw*0.66);
-    items.forEach((d,i)=>{
-      const muted = registerFilter && d.register!==registerFilter;
-      html+=`<div class="tile ${d.placeholder?'ph':''} ${muted?'mute':''}" data-id="${d.id}"
-        style="left:${x0+pad+(i%cols)*tw}px;top:${y0+pad+Math.floor(i/cols)*th}px;
-               width:${tw-1}px;height:${th-1}px">
-        <img src="${IMG(d.file)}" loading="lazy" alt=""></div>`;
+    const cols=Math.ceil(Math.sqrt(its.length*1.6)), pad=3;
+    const tw=(cw-pad*2)/cols, th=Math.min((ch-pad*2)/Math.ceil(its.length/cols), tw*0.7);
+    its.forEach((d,i)=>{
+      html+=`<div class="tile" data-id="${d.id}" style="left:${x0+pad+(i%cols)*tw}px;
+        top:${y0+pad+Math.floor(i/cols)*th}px;width:${tw-1}px;height:${th-1}px">
+        <img src="${THUMB(d.thumb)}" loading="lazy" alt=""></div>`;
     });
   }));
 
   grid.innerHTML=html;
-  document.getElementById('axX').textContent='X → '+FIELD_LABELS[xKey].toUpperCase();
-  document.getElementById('axY').textContent='Y ↓ '+FIELD_LABELS[yKey].toUpperCase();
+  axX.textContent='X → '+xa.label.toUpperCase();
+  axY.textContent='Y ↓ '+ya.label.toUpperCase();
 
-  const total=xs.length*ys.length;
-  document.getElementById('stats').innerHTML=
-    `<b>${DATA.length}</b> items · ${STATS.real} real + ${STATS.placeholder} placeholder<br>
-     <b>${filled}</b>/${total} cells occupied (${Math.round(filled/total*100)}%)<br>
-     <span class="gapline"><b>${total-filled}</b> empty — layouts nobody has built</span>`;
+  const total=xs.length*ys.length, V=cramersV(rows,xa,ya);
+  const verdict = V<0.20 ? ['good','INDEPENDENT','These two fields barely predict each other, so a two-dimensional plot is honest here — every cell is a genuinely different combination.']
+    : V<0.40 ? ['','LOOSELY LINKED','There is a real association. The plane still works, but expect a lean rather than an even scatter.']
+    : ['bad','REDUNDANT','One field is largely a re-description of the other. Plotting them as two axes invents a dimension the data does not have — use a single ordered layout instead.'];
+  document.getElementById('verdict').innerHTML=
+    `<span class="lead">ASSOCIATION — CRAMÉR’S V</span>
+     <span class="v ${verdict[0]}">${V.toFixed(2)} <b style="font-size:10px;letter-spacing:.12em">${verdict[1]}</b></span>
+     <p>${verdict[2]}</p>
+     <p><b style="color:var(--fg)">${filled}</b>/${total} cells filled ·
+        <span class="bad">${total-filled} empty</span> · ${rows.length} items shown</p>`;
 
-  /* interaction */
-  grid.querySelectorAll('.tile').forEach(t=>{
-    const d=DATA.find(o=>o.id===t.dataset.id);
-    t.onmouseenter=()=>{t.classList.add('hot');show(d);};
-    t.onmouseleave=()=>t.classList.remove('hot');
+  grid.querySelectorAll('.tile').forEach(el=>{
+    const d=DATA.find(o=>o.id===el.dataset.id);
+    el.onmouseenter=()=>{el.classList.add('hot');show(d)};
+    el.onmouseleave=()=>el.classList.remove('hot');
+    el.onclick=()=>window.open(d.live,'_blank');
   });
   grid.querySelectorAll('.cell').forEach(c=>{
-    c.onmouseenter=()=>{
-      c.classList.add('hover');
-      const items=DATA.filter(d=>d[xKey]===c.dataset.x&&d[yKey]===c.dataset.y);
-      if(!items.length) showGap(c.dataset.x,c.dataset.y);
-    };
-    c.onmouseleave=()=>c.classList.remove('hover');
+    c.onmouseenter=()=>{c.classList.add('hi');
+      if(!rows.some(d=>xa.of(d)===c.dataset.x&&ya.of(d)===c.dataset.y)) gap(c.dataset.x,c.dataset.y)};
+    c.onmouseleave=()=>c.classList.remove('hi');
   });
 }
 
 function show(d){
-  document.getElementById('prev').innerHTML=`<img src="${IMG(d.file)}" alt="">`;
+  document.getElementById('prev').innerHTML=`<img src="${THUMB(d.thumb)}" alt="">`;
+  const sw=c=>`<span class="sw" style="background:${c}"></span>`;
   document.getElementById('meta').innerHTML=
-    (d.placeholder?`<span class="flag">▲ PLACEHOLDER SLOT</span>`:``)+
-    `<span class="t">${d.title.toUpperCase()}</span>`+
-    `<div class="row"><span>id</span><b>${d.id} · ${d.year}</b></div>`+
-    PLOTTABLE.map(k=>`<div class="row"><span>${FIELD_LABELS[k]}</span><b>${d[k]}</b></div>`).join('');
+    `<span class="t">${d.title}</span>
+     <div class="row"><span>rank</span><b>${d.rank} / ${RMAX}</b></div>
+     <div class="row"><span>band</span><b>${META.bandLabels[d.spectrum]}</b></div>
+     <div class="row"><span>meaning</span><b>${d.meaning}</b></div>
+     <div class="row"><span>subject</span><b>${d.category}</b></div>
+     <div class="row"><span>register</span><b>${d.world?'real-world':'graphic'}</b></div>
+     <div class="row"><span>colour</span><b>${d.hex}${sw(d.hex)}</b></div>
+     <div class="row"><span>hue / light</span><b>${HUE(d.h)} · ${Math.round(d.l)}%</b></div>
+     ${d.animated?`<div class="row"><span></span><b style="color:var(--hot)">ANIMATED</b></div>`:''}
+     ${d.aka.length?`<div style="margin-top:8px;font-style:italic;opacity:.7">“${d.aka[0]}”</div>`:''}`;
 }
-function showGap(x,y){
+function gap(x,y){
   document.getElementById('prev').innerHTML='';
   document.getElementById('meta').innerHTML=
     `<span class="t" style="color:var(--gap)">EMPTY CELL</span>
-     <div class="row"><span>${FIELD_LABELS[xKey]}</span><b>${x}</b></div>
-     <div class="row"><span>${FIELD_LABELS[yKey]}</span><b>${y}</b></div>
-     <p style="margin-top:12px;line-height:1.8">No precedent in the set combines these.
-     Either nobody has built it, or you have not found it yet. This is where your
-     own project can sit.</p>`;
+     <div class="row"><span>${AXES[xK].label}</span><b>${x}</b></div>
+     <div class="row"><span>${AXES[yK].label}</span><b>${y}</b></div>
+     <p style="margin-top:11px;line-height:1.85">No item in the archive combines these.
+     Either the combination does not occur in the world, or the collection has not
+     looked for it. Empty cells are the shortlist for what to shoot next.</p>`;
 }
-
 addEventListener('resize',render);
 render();
 </script>

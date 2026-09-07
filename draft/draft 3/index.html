@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Draft 3 — Coordinate Space</title>
+<title>256 — Coordinate Space</title>
 <style>
   :root{
-    --bg:#050506; --fg:#e8e8e4; --dim:#5a5a63; --line:#1c1c21;
+    --bg:#050506; --fg:#eceae6; --dim:#5c5c66; --line:#1d1d23;
     --hot:#38e08a; --warn:#ff4d2e;
+    --order:#4da3ff; --inhab:#ffc84d; --press:#ff4d2e;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
@@ -15,91 +16,71 @@
   body{background:var(--bg);color:var(--fg);font-family:var(--mono);
        font-size:11px;letter-spacing:.06em;overflow:hidden}
 
-  /* ---------- header ---------- */
-  #head{position:fixed;top:0;left:0;right:300px;height:56px;z-index:30;
-    border-bottom:1px solid var(--line);display:flex;align-items:center;
-    gap:22px;padding:0 20px}
-  .brand{font-size:10px;letter-spacing:.2em;line-height:1.55}
+  #head{position:fixed;top:0;left:0;right:318px;height:58px;z-index:40;
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 18px}
+  .brand{font-size:10px;letter-spacing:.19em;line-height:1.55}
   .brand i{font-style:normal;color:var(--dim);display:block;font-size:8px}
-
-  #addr{display:flex;align-items:center;gap:8px}
-  #addr label{font-size:8px;color:var(--dim);letter-spacing:.16em}
-  #cmd{font:inherit;font-size:15px;letter-spacing:.2em;background:#0d0d10;
-    color:var(--hot);border:1px solid var(--line);padding:5px 10px;width:88px;
-    text-transform:uppercase;outline:none}
+  #cmd{font:inherit;font-size:15px;letter-spacing:.19em;background:#0d0d11;color:var(--hot);
+    border:1px solid var(--line);padding:5px 9px;width:86px;text-transform:uppercase;outline:none}
   #cmd:focus{border-color:var(--hot)}
-
-  .sw{display:flex;align-items:center;gap:7px;color:var(--dim);cursor:pointer;user-select:none}
-  .sw:hover{color:var(--fg)}
-  .sw .box{width:10px;height:10px;border:1px solid #2e2e36}
-  .sw.on .box{background:var(--warn);border-color:var(--warn)}
-  .sw.on{color:var(--fg)}
-  .sw span{font-size:9px;letter-spacing:.12em}
-  .btn{border:1px solid var(--line);background:#0d0d10;color:var(--dim);
-    padding:6px 10px;cursor:pointer;font:inherit;font-size:9px;letter-spacing:.14em}
+  .lbl{font-size:8px;color:var(--dim);letter-spacing:.15em}
+  .btn{border:1px solid var(--line);background:#0d0d11;color:var(--dim);padding:5px 9px;
+    cursor:pointer;font:inherit;font-size:9px;letter-spacing:.12em}
   .btn:hover{color:var(--fg);border-color:var(--fg)}
+  .btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  .sorts{display:flex;gap:1px;margin-left:auto}
 
-  #progress{margin-left:auto;text-align:right;font-size:9px;color:var(--dim);line-height:1.6}
-  #progress b{color:var(--hot);font-weight:400;font-size:15px;letter-spacing:.1em}
-
-  /* ---------- field ---------- */
-  #field{position:fixed;top:56px;left:0;right:300px;bottom:44px;
+  #field{position:fixed;top:58px;left:0;right:318px;bottom:52px;
     display:flex;align-items:center;justify-content:center}
-  #board{position:relative;transition:width .6s,height .6s}
-
-  .c{position:absolute;border:1px solid var(--line);transition:
-     background .35s, border-color .25s, opacity .5s;overflow:hidden}
-  .c .thumb{position:absolute;inset:0;opacity:0;transition:opacity .5s}
-  .c .thumb img{width:100%;height:100%;object-fit:cover;display:block}
-  .c.seen .thumb{opacity:.82}
-  .c.seen.empty{background:#0b0b0e}
-  .c.seen.empty::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;
-    background:#26262c;transform:translate(-50%,-50%)}
-  .c.flash .thumb{opacity:.95}
-  .c.flash{border-color:var(--hot)}
-  .c.cursor{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot),0 0 22px rgba(56,224,138,.35);z-index:50}
-  .c.cursor .thumb{opacity:1}
-  .c .adj{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    font-size:9px;color:#3a3a44;pointer-events:none}
-
-  /* rulers */
+  #board{position:relative}
+  .c{position:absolute;border:1px solid var(--line);overflow:hidden;
+     transition:transform .55s cubic-bezier(.22,.9,.24,1),left .55s,top .55s,border-color .2s}
+  .c .th{position:absolute;inset:0;opacity:0;transition:opacity .45s}
+  .c .th img{width:100%;height:100%;object-fit:cover;display:block}
+  .c.seen .th,.c.showall .th{opacity:.9}
+  .c .tint{position:absolute;inset:0;opacity:.30}
+  .c.seen .tint,.c.showall .tint{opacity:0;transition:opacity .45s}
+  .c.cur{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot),0 0 20px rgba(56,224,138,.45);z-index:60}
+  .c.cur .th{opacity:1}
+  .c.target{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn)}
   .ruler{position:absolute;color:var(--dim);font-size:8px;letter-spacing:.1em;pointer-events:none}
   .ruler.on{color:var(--hot)}
 
-  /* ---------- side ---------- */
-  #side{position:fixed;top:0;right:0;bottom:0;width:300px;z-index:20;
-    border-left:1px solid var(--line);padding:18px;display:flex;flex-direction:column}
-  #prev{width:100%;aspect-ratio:16/10;background:#0b0b0e;border:1px solid var(--line);
-    overflow:hidden;margin-bottom:14px;display:flex;align-items:center;
-    justify-content:center;color:var(--dim);font-size:9px;letter-spacing:.16em}
+  #side{position:fixed;top:0;right:0;bottom:0;width:318px;z-index:30;
+    border-left:1px solid var(--line);padding:16px;display:flex;flex-direction:column}
+  #prev{width:100%;aspect-ratio:16/10;background:#0c0c10;border:1px solid var(--line);
+    overflow:hidden;margin-bottom:12px;display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-size:9px;letter-spacing:.15em}
   #prev img{width:100%;height:100%;object-fit:cover;display:block}
-  #meta{font-size:9px;line-height:1.8;color:var(--dim);flex:1;overflow:auto}
-  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.09em;display:block;margin-bottom:9px}
-  #meta .row{display:flex;justify-content:space-between;gap:10px;
+  #meta{font-size:9px;line-height:1.78;color:var(--dim);flex:1;overflow:auto}
+  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.08em;display:block;margin-bottom:8px;line-height:1.5}
+  #meta .row{display:flex;justify-content:space-between;gap:9px;
     border-bottom:1px solid rgba(255,255,255,.05);padding:2px 0}
   #meta .row b{color:var(--fg);font-weight:400}
-  #meta .flag{color:var(--warn);display:block;margin-bottom:6px}
-  #meta .empty{color:var(--dim);line-height:1.9}
-  #sensor{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;
-    font-size:9px;color:var(--dim);line-height:1.9}
-  #sensor .big{color:var(--hot);font-size:26px;letter-spacing:.06em;display:block;margin:2px 0 4px}
-
-  #foot{position:fixed;left:0;right:300px;bottom:0;height:44px;z-index:30;
-    border-top:1px solid var(--line);display:flex;align-items:center;
-    padding:0 20px;gap:20px;color:var(--dim);font-size:9px;letter-spacing:.12em}
-  #shout{color:var(--warn);opacity:0;transition:opacity .4s}
+  #quest{border-top:2px solid var(--warn);margin-top:12px;padding-top:12px;font-size:9px;line-height:1.8}
+  #quest .lead{color:var(--warn);letter-spacing:.14em;font-size:8px;display:block;margin-bottom:6px}
+  #quest .q{color:var(--fg);line-height:1.75}
+  #quest .mv{color:var(--dim);margin-top:7px}
+  #quest .mv b{color:var(--hot);font-weight:400}
+  #foot{position:fixed;left:0;right:318px;bottom:0;height:52px;z-index:40;
+    border-top:1px solid var(--line);display:flex;align-items:center;padding:0 18px;gap:18px;
+    color:var(--dim);font-size:9px;letter-spacing:.11em}
+  #shout{color:var(--hot);opacity:0;transition:opacity .35s;margin-left:auto}
   #shout.on{opacity:1}
 </style>
 </head>
 <body>
 
 <div id="head">
-  <div class="brand">256 / DRAFT 03<i>COORDINATE SPACE — NO MENU, ONLY ADDRESSES</i></div>
-  <div id="addr"><label>GO TO</label><input id="cmd" placeholder="A1" maxlength="4"></div>
-  <button class="btn" id="reveal">REVEAL 1s</button>
-  <div class="sw" id="sw-comp"><div class="box"></div><span>COMPRESS</span></div>
-  <div class="sw" id="sw-trans"><div class="box"></div><span>TRANSPOSE</span></div>
-  <div id="progress"><b id="found">000</b><br>OF <span id="tot"></span> FOUND</div>
+  <div class="brand">256 / DRAFT 03<i>COORDINATE SPACE — 16×16, EVERY ADDRESS HOLDS EXACTLY ONE ITEM</i></div>
+  <span class="lbl">GO TO</span><input id="cmd" placeholder="A1" maxlength="4">
+  <button class="btn" id="bShow">SHOW ALL</button>
+  <div class="sorts">
+    <button class="btn on" data-s="rank">RANK</button>
+    <button class="btn" data-s="category">SUBJECT</button>
+    <button class="btn" data-s="colour">COLOUR</button>
+    <button class="btn" data-s="meaning">MEANING</button>
+  </div>
 </div>
 
 <div id="field"><div id="board"></div></div>
@@ -107,218 +88,147 @@
 <div id="side">
   <div id="prev">NOTHING SELECTED</div>
   <div id="meta"></div>
-  <div id="sensor"></div>
+  <div id="quest"></div>
 </div>
 
 <div id="foot">
-  <span>↑↓←→ / WASD MOVE</span>
-  <span>TYPE AN ADDRESS + ENTER</span>
-  <span>THE FIELD IS DARK — DEDUCE WHERE THE CONTENT IS</span>
+  <span>↑↓←→ / WASD</span><span>TYPE AN ADDRESS + ENTER</span>
+  <span>RE-SORTING RE-ADDRESSES EVERY ITEM</span>
   <span id="shout"></span>
 </div>
 
 <script src="../assets/data.js"></script>
 <script>
 /* ------------------------------------------------------------------
-   A grid with no menu. Content sits at addresses you cannot see.
-   The status panel tells you only how many of the eight neighbouring
-   cells are occupied — you find the archive by inference.
-   COMPRESS and TRANSPOSE rewrite every address you have memorised.
+   256 items, 256 cells: the archive is exactly addressable. Nothing
+   is hidden by scarcity — what is hidden is which item sits where.
+   Changing the sort rewrites every address at once, which is the
+   whole argument: a grid is an addressing scheme, not a picture.
 ------------------------------------------------------------------ */
 
-let COLS=20, ROWS=10;
-let compressed=false, transposed=false;
-let cx=0, cy=0;
-let placement=[];                 /* index -> item | null */
-const visited=new Set();
+const SIDE=META.side;                 /* 16 */
+const BANDC={order:'#4da3ff',inhabited:'#ffc84d',pressure:'#ff4d2e'};
+const HUE=h=>h<20||h>=330?0:h<45?1:h<70?2:h<160?3:h<200?4:h<255?5:6;
 
-const LETTER = c => String.fromCharCode(65+c);
-const idx = (x,y) => y*COLS + x;
-const addrOf = (x,y) => LETTER(x)+(y+1);
+let sort='rank', showAll=false, cx=0, cy=0, moves=0, target=null;
+let order=[];                          /* address index -> item */
+const seen=new Set();
 
-/* ---------- deterministic placement ---------- */
-function seeded(i){ const x=Math.sin(i*127.1+311.7)*43758.5453; return x-Math.floor(x); }
+const L=c=>String.fromCharCode(65+c);
+const addr=(x,y)=>L(x)+(y+1);
+const ix=(x,y)=>y*SIDE+x;
 
-function buildPlacement(){
-  const total=COLS*ROWS;
-  placement=new Array(total).fill(null);
+const SORTS={
+  rank:    a=>a.slice().sort((p,q)=>p.rank-q.rank),
+  category:a=>a.slice().sort((p,q)=>p.category.localeCompare(q.category)||p.rank-q.rank),
+  colour:  a=>a.slice().sort((p,q)=>HUE(p.h)-HUE(q.h)||q.l-p.l),
+  meaning: a=>a.slice().sort((p,q)=>META.meanings.indexOf(p.meaning)-META.meanings.indexOf(q.meaning)||p.rank-q.rank),
+};
 
-  if(compressed){
-    /* every empty cell removed — the archive packs to the front */
-    DATA.forEach((d,i)=>{ if(i<total) placement[i]=d; });
-  } else {
-    /* scatter deterministically across the whole field */
-    const slots=[...Array(total).keys()]
-      .map(i=>({i,k:seeded(i+1)}))
-      .sort((a,b)=>a.k-b.k)
-      .slice(0,DATA.length)
-      .map(o=>o.i);
-    slots.forEach((slot,n)=>placement[slot]=DATA[n]);
-  }
+function build(){ order=SORTS[sort](DATA); }
 
-  if(transposed){
-    const t=new Array(total).fill(null);
-    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-      const nx=y%COLS, ny=x%ROWS;      /* fold the transpose back into the field */
-      t[ny*COLS+nx]=placement[y*COLS+x];
-    }
-    placement=t;
-  }
-}
-
-/* ---------- render ---------- */
 const board=document.getElementById('board');
-
-function sizeBoard(){
-  const fw=document.getElementById('field').clientWidth-60;
-  const fh=document.getElementById('field').clientHeight-60;
-  const cell=Math.floor(Math.min(fw/COLS, fh/ROWS));
-  board.style.width =(cell*COLS)+'px';
-  board.style.height=(cell*ROWS)+'px';
-  return cell;
+function cellSize(){
+  const f=document.getElementById('field');
+  return Math.floor(Math.min((f.clientWidth-70)/SIDE,(f.clientHeight-52)/SIDE));
 }
 
 function render(){
-  const cell=sizeBoard();
-  let html='';
-
-  for(let y=0;y<ROWS;y++){
-    for(let x=0;x<COLS;x++){
-      const i=idx(x,y), d=placement[i], seen=visited.has(i);
-      const cls=['c'];
-      if(seen) cls.push('seen');
-      if(seen && !d) cls.push('empty');
-      if(x===cx&&y===cy) cls.push('cursor');
-      html+=`<div class="${cls.join(' ')}" data-i="${i}"
-        style="left:${x*cell}px;top:${y*cell}px;width:${cell}px;height:${cell}px">
-        ${d?`<div class="thumb"><img src="${IMG(d.file)}" loading="lazy" alt=""></div>`:''}
-      </div>`;
-    }
+  const s=cellSize();
+  board.style.width=(s*SIDE)+'px'; board.style.height=(s*SIDE)+'px';
+  let h='';
+  for(let y=0;y<SIDE;y++)for(let x=0;x<SIDE;x++){
+    const i=ix(x,y), d=order[i];
+    const cls=['c']; if(seen.has(i))cls.push('seen'); if(showAll)cls.push('showall');
+    if(x===cx&&y===cy)cls.push('cur');
+    if(target&&d&&d.id===target.id&&(seen.has(i)||showAll))cls.push('target');
+    h+=`<div class="${cls.join(' ')}" data-i="${i}"
+      style="left:${x*s}px;top:${y*s}px;width:${s}px;height:${s}px">
+      <div class="th"><img src="${THUMB(d.thumb)}" loading="lazy" alt=""></div>
+      <div class="tint" style="background:${BANDC[d.spectrum]}"></div></div>`;
   }
-
-  /* rulers */
-  for(let x=0;x<COLS;x++)
-    html+=`<div class="ruler ${x===cx?'on':''}" style="left:${x*cell+cell/2-4}px;top:-16px">${LETTER(x)}</div>`;
-  for(let y=0;y<ROWS;y++)
-    html+=`<div class="ruler ${y===cy?'on':''}" style="left:-18px;top:${y*cell+cell/2-5}px">${y+1}</div>`;
-
-  board.innerHTML=html;
+  for(let x=0;x<SIDE;x++)h+=`<div class="ruler ${x===cx?'on':''}" style="left:${x*s+s/2-4}px;top:-15px">${L(x)}</div>`;
+  for(let y=0;y<SIDE;y++)h+=`<div class="ruler ${y===cy?'on':''}" style="left:-20px;top:${y*s+s/2-5}px">${y+1}</div>`;
+  board.innerHTML=h;
   board.querySelectorAll('.c').forEach(c=>c.onclick=()=>{
-    const i=+c.dataset.i; cx=i%COLS; cy=Math.floor(i/COLS); step();
+    const i=+c.dataset.i; cx=i%SIDE; cy=(i/SIDE)|0; go();
   });
 }
 
-/* ---------- movement ---------- */
-function step(){
-  const i=idx(cx,cy);
-  const wasNew = !visited.has(i);
-  visited.add(i);
-  const d=placement[i];
-  if(wasNew && d) flash(`FOUND ${d.id.toUpperCase()} AT ${addrOf(cx,cy)}`);
-  render();
-  panel(d);
-  sensor();
+function go(){
+  const i=ix(cx,cy); seen.add(i); moves++;
+  const d=order[i];
+  render(); info(d); quest();
+  if(target&&d.id===target.id){ shout(`FOUND IT AT ${addr(cx,cy)} — ${moves} MOVES`); newTarget(); }
 }
 
-function neighbours(){
-  let n=0;
-  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-    if(!dx&&!dy) continue;
-    const x=cx+dx, y=cy+dy;
-    if(x<0||y<0||x>=COLS||y>=ROWS) continue;
-    if(placement[idx(x,y)]) n++;
-  }
-  return n;
+function info(d){
+  document.getElementById('prev').innerHTML=`<img src="${THUMB(d.thumb)}" alt="">`;
+  document.getElementById('meta').innerHTML=
+    `<span class="t">${d.title}</span>
+     <div class="row"><span>address</span><b style="color:var(--hot)">${addr(cx,cy)}</b></div>
+     <div class="row"><span>rank</span><b>${d.rank}</b></div>
+     <div class="row"><span>band</span><b>${META.bandLabels[d.spectrum]}</b></div>
+     <div class="row"><span>meaning</span><b>${d.meaning}</b></div>
+     <div class="row"><span>subject</span><b>${d.category}</b></div>
+     <div class="row"><span>register</span><b>${d.world?'real-world':'graphic'}</b></div>
+     <div class="row"><span>colour</span><b>${d.hex}</b></div>
+     ${d.animated?`<div class="row"><span></span><b style="color:var(--warn)">ANIMATED</b></div>`:''}
+     <div class="row"><span>seen</span><b>${seen.size} / ${SIDE*SIDE}</b></div>`;
 }
 
-function sensor(){
-  const n=neighbours();
-  const foundCount=[...visited].filter(i=>placement[i]).length;
-  document.getElementById('found').textContent=String(foundCount).padStart(3,'0');
-  document.getElementById('tot').textContent=DATA.length;
-  document.getElementById('sensor').innerHTML=
-    `ADDRESS <b style="color:var(--hot)">${addrOf(cx,cy)}</b><br>
-     OCCUPIED NEIGHBOURS<span class="big">${n}</span>
-     ${n===0?'nothing adjacent — move on':'content is touching this cell'}<br>
-     <span style="opacity:.6">${visited.size} of ${COLS*ROWS} cells opened</span>`;
+function newTarget(){
+  target=DATA[Math.floor(Math.random()*DATA.length)]; moves=0; quest();
+}
+function quest(){
+  if(!target) return;
+  const pos=order.findIndex(o=>o.id===target.id);
+  const found=seen.has(pos);
+  document.getElementById('quest').innerHTML=
+    `<span class="lead">FIND THIS ITEM</span>
+     <div class="q">${target.title}</div>
+     <div class="mv">band <b>${target.spectrum}</b> · meaning <b>${target.meaning}</b>
+       · subject <b>${target.category}</b></div>
+     <div class="mv">moves <b>${moves}</b>${found?` · it is at <b>${addr(pos%SIDE,(pos/SIDE)|0)}</b>`:''}</div>
+     <div class="mv" style="margin-top:8px;opacity:.7">Its address depends on the sort.
+       Switch the sort and it moves.</div>`;
 }
 
-function panel(d){
-  const prev=document.getElementById('prev'), meta=document.getElementById('meta');
-  if(!d){
-    prev.innerHTML='EMPTY CELL';
-    meta.innerHTML=`<span class="t">${addrOf(cx,cy)} — EMPTY</span>
-      <p class="empty">Nothing is stored here. An empty cell still costs you a move:
-      that is what a coordinate system charges for the promise that everything
-      has an address.</p>`;
-    return;
-  }
-  prev.innerHTML=`<img src="${IMG(d.file)}" alt="">`;
-  const keys=['geometry','orderedBy','navigation','dimension','medium',
-              'density','structure','effort','ground','field','register'];
-  meta.innerHTML=
-    (d.placeholder?`<span class="flag">▲ PLACEHOLDER SLOT</span>`:``)+
-    `<span class="t">${d.title.toUpperCase()}</span>
-     <div class="row"><span>address</span><b>${addrOf(cx,cy)}</b></div>
-     <div class="row"><span>id</span><b>${d.id} · ${d.year}</b></div>`+
-    keys.map(k=>`<div class="row"><span>${FIELD_LABELS[k]}</span><b>${d[k]}</b></div>`).join('');
+let st; function shout(m){
+  const e=document.getElementById('shout'); e.textContent=m; e.classList.add('on');
+  clearTimeout(st); st=setTimeout(()=>e.classList.remove('on'),2200);
 }
 
-let shoutT;
-function flash(msg){
-  const s=document.getElementById('shout');
-  s.textContent=msg; s.classList.add('on');
-  clearTimeout(shoutT); shoutT=setTimeout(()=>s.classList.remove('on'),1800);
-}
-
-/* ---------- controls ---------- */
 addEventListener('keydown',e=>{
-  if(document.activeElement===document.getElementById('cmd')) return;
-  const k=e.key.toLowerCase();
-  let moved=true;
-  if(k==='arrowleft' ||k==='a') cx=Math.max(0,cx-1);
-  else if(k==='arrowright'||k==='d') cx=Math.min(COLS-1,cx+1);
-  else if(k==='arrowup'   ||k==='w') cy=Math.max(0,cy-1);
-  else if(k==='arrowdown' ||k==='s') cy=Math.min(ROWS-1,cy+1);
-  else moved=false;
-  if(moved){ e.preventDefault(); step(); }
+  if(document.activeElement===document.getElementById('cmd'))return;
+  const k=e.key.toLowerCase(); let m=true;
+  if(k==='arrowleft'||k==='a')cx=Math.max(0,cx-1);
+  else if(k==='arrowright'||k==='d')cx=Math.min(SIDE-1,cx+1);
+  else if(k==='arrowup'||k==='w')cy=Math.max(0,cy-1);
+  else if(k==='arrowdown'||k==='s')cy=Math.min(SIDE-1,cy+1);
+  else m=false;
+  if(m){e.preventDefault();go()}
 });
-
 document.getElementById('cmd').addEventListener('keydown',e=>{
-  if(e.key!=='Enter') return;
-  const v=e.target.value.trim().toUpperCase();
-  const m=v.match(/^([A-Z])(\d{1,2})$/);
-  if(!m){ flash('BAD ADDRESS'); return; }
-  const x=m[1].charCodeAt(0)-65, y=parseInt(m[2],10)-1;
-  if(x<0||x>=COLS||y<0||y>=ROWS){ flash(`${v} IS OUTSIDE THE FIELD`); return; }
-  cx=x; cy=y; e.target.value=''; e.target.blur(); step();
+  if(e.key!=='Enter')return;
+  const v=e.target.value.trim().toUpperCase(), mm=v.match(/^([A-Z])(\d{1,2})$/);
+  if(!mm)return shout('BAD ADDRESS');
+  const x=mm[1].charCodeAt(0)-65, y=+mm[2]-1;
+  if(x<0||x>=SIDE||y<0||y>=SIDE)return shout(`${v} IS OUTSIDE THE FIELD`);
+  cx=x;cy=y;e.target.value='';e.target.blur();go();
 });
-
-document.getElementById('reveal').onclick=()=>{
-  board.querySelectorAll('.c').forEach(c=>{
-    if(placement[+c.dataset.i]) c.classList.add('flash');
-  });
-  flash('REVEALED — MEMORISE IT');
-  setTimeout(()=>board.querySelectorAll('.c').forEach(c=>c.classList.remove('flash')),1200);
+document.getElementById('bShow').onclick=e=>{
+  showAll=!showAll; e.target.classList.toggle('on',showAll); render();
 };
-
-const bind=(id,fn)=>{const el=document.getElementById(id);
-  el.onclick=()=>{el.classList.toggle('on');fn(el.classList.contains('on'));};};
-
-bind('sw-comp',v=>{
-  compressed=v; buildPlacement(); render(); sensor(); panel(placement[idx(cx,cy)]);
-  flash(v?'COMPRESSED — EVERY ADDRESS YOU LEARNED IS NOW WRONG':'RESTORED');
+document.querySelectorAll('.sorts .btn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.sorts .btn').forEach(o=>o.classList.remove('on'));
+  b.classList.add('on'); sort=b.dataset.s; build(); render();
+  info(order[ix(cx,cy)]); quest();
+  shout(`RE-SORTED BY ${sort.toUpperCase()} — EVERY ADDRESS HAS CHANGED`);
 });
-bind('sw-trans',v=>{
-  transposed=v; buildPlacement(); render(); sensor(); panel(placement[idx(cx,cy)]);
-  flash(v?'TRANSPOSED — ROWS AND COLUMNS HAVE SWAPPED':'RESTORED');
-});
-
 addEventListener('resize',render);
 
-buildPlacement();
-render();
-step();
+build(); render(); newTarget(); go();
 </script>
 </body>
 </html>

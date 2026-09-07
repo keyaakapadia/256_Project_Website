@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draft 1 — Geometry Switch</title>
+<style>
+  :root{
+    --bg:#08080a; --fg:#f2f2f0; --dim:#6b6b73; --line:#242429; --hot:#ff4d2e;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--fg); font-family:var(--mono);
+    font-size:11px; letter-spacing:.06em; overflow:hidden;
+  }
+
+  #stage{position:fixed;inset:0;perspective:1500px;perspective-origin:50% 46%}
+  #world{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform}
+
+  .item{
+    position:absolute;left:50%;top:46%;
+    transform-style:preserve-3d;
+    transition:transform 1.05s cubic-bezier(.22,.9,.24,1),
+               opacity .45s ease, filter .45s ease, width .8s, height .8s;
+    cursor:pointer;
+  }
+  .item img{
+    display:block;width:100%;height:100%;object-fit:cover;
+    border:1px solid rgba(255,255,255,.13); background:#111;
+  }
+  .item.ph img{opacity:.5;filter:grayscale(.55)}
+  .item.dim{opacity:.06;filter:grayscale(1)}
+  .item.hot{z-index:9999!important}
+  .item.hot img{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot),0 0 40px rgba(255,77,46,.4);opacity:1;filter:none}
+
+  #structure{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .5s}
+  #structure.on{opacity:1}
+  #structure line,#structure rect,#structure ellipse,#structure circle{
+    stroke:rgba(255,255,255,.2);fill:none;stroke-width:1;vector-effect:non-scaling-stroke}
+  #structure text{fill:rgba(255,255,255,.32);font:8px var(--mono);letter-spacing:.14em}
+
+  .rail{position:fixed;z-index:20}
+  #left{left:22px;top:22px;width:190px}
+  .brand{font-size:10px;letter-spacing:.22em;margin-bottom:2px}
+  .sub{font-size:9px;color:var(--dim);margin-bottom:20px;line-height:1.7}
+
+  .geos{display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--line)}
+  .geo{display:flex;align-items:baseline;gap:9px;padding:5px 8px;
+    border-bottom:1px solid var(--line);color:var(--dim);cursor:pointer;
+    transition:.16s;user-select:none}
+  .geo:hover{color:var(--fg);background:#101014}
+  .geo.on{color:var(--bg);background:var(--fg)}
+  .geo .k{width:9px;font-size:9px;opacity:.6}
+  .geo .n{flex:1;letter-spacing:.14em;text-transform:uppercase;font-size:10px}
+  .geo .c{font-size:9px;opacity:.55}
+
+  .switches{margin-top:18px;display:flex;flex-direction:column;gap:7px}
+  .sw{display:flex;align-items:center;gap:8px;color:var(--dim);cursor:pointer;user-select:none}
+  .sw:hover{color:var(--fg)}
+  .box{width:11px;height:11px;border:1px solid #35353c;flex:none}
+  .sw.on .box{background:var(--hot);border-color:var(--hot)}
+  .sw.on{color:var(--fg)}
+  .sw span{font-size:9px;letter-spacing:.12em}
+
+  #right{right:22px;top:22px;width:236px;text-align:right}
+  #readout{color:var(--dim);line-height:1.8;font-size:9px;min-height:150px}
+  #readout .t{color:var(--fg);font-size:10px;letter-spacing:.1em;margin-bottom:8px;display:block}
+  #readout b{color:var(--fg);font-weight:400}
+  #readout .row{display:flex;justify-content:flex-end;gap:8px}
+  #readout .row i{font-style:normal;opacity:.45;min-width:66px;text-align:right}
+  #readout .flag{color:var(--hot);margin-bottom:6px;display:block}
+
+  #bottom{left:22px;right:22px;bottom:18px;display:flex;justify-content:space-between;
+    align-items:flex-end;color:var(--dim);font-size:9px;pointer-events:none}
+  #count b{color:var(--fg);font-weight:400}
+  .desc{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);z-index:20;
+    text-align:center;color:var(--dim);font-size:9px;letter-spacing:.15em;
+    max-width:560px;line-height:1.8;transition:opacity .4s;pointer-events:none}
+  .desc b{color:var(--fg);font-weight:400;letter-spacing:.2em}
+</style>
+</head>
+<body>
+
+<div id="stage"><div id="world"></div></div>
+<svg id="structure"></svg>
+
+<div class="rail" id="left">
+  <div class="brand">256 / DRAFT 01</div>
+  <div class="sub">GEOMETRY SWITCH<br>the page becomes the shape it describes</div>
+  <div class="geos" id="geos"></div>
+  <div class="switches">
+    <div class="sw" id="sw-iso"><div class="box"></div><span>ISOLATE MATCHES</span></div>
+    <div class="sw on" id="sw-str"><div class="box"></div><span>SHOW STRUCTURE</span></div>
+    <div class="sw" id="sw-spin"><div class="box"></div><span>AUTO ORBIT</span></div>
+    <div class="sw" id="sw-ph"><div class="box"></div><span>HIDE PLACEHOLDERS</span></div>
+  </div>
+</div>
+
+<div class="rail" id="right"><div id="readout"></div></div>
+<div class="desc" id="desc"></div>
+
+<div class="rail" id="bottom">
+  <div id="count"></div>
+  <div>1–0 SWITCH GEOMETRY · DRAG TO ORBIT · HOVER FOR METADATA</div>
+</div>
+
+<script src="../assets/data.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   Each geometry is a pure function of (index, n, viewport).
+   Switching re-runs the layout; CSS transitions do the travel.
+   Sizes scale with n, so this holds 21 or 300 without re-tuning.
+------------------------------------------------------------------ */
+
+const GEOS = [
+  { key:'axis',    note:'ONE DIMENSION. Position encodes time — every other relationship is surrendered.' },
+  { key:'matrix',  note:'EQUAL CELLS. Nothing may be larger than anything else. Order without hierarchy.' },
+  { key:'cloud',   note:'NO CELLS AT ALL. Proximity implies similarity; the viewer supplies the structure.' },
+  { key:'orbit',   note:'A LOOP HAS NO FIRST ITEM. Circular order refuses to rank what it holds.' },
+  { key:'tunnel',  note:'DEPTH BECOMES SEQUENCE. You are inside the archive, not in front of it.' },
+  { key:'deck',    note:'STACKED EDGE-ON. Density becomes legible; the individual image does not.' },
+  { key:'section', note:'A CUT THROUGH SPACE. Borrowed from architecture — the street as an axis.' },
+  { key:'radial',  note:'ONE CENTRE, MANY SPOKES. The structure asserts a hierarchy the images never had.' },
+  { key:'canvas',  note:'THE GRID SWITCHED OFF. Placement is authored by hand, not computed.' },
+  { key:'wall',    note:'A FIELD SEEN ALL AT ONCE. The collection reads as a single object.' },
+];
+
+const world = document.getElementById('world');
+const svg   = document.getElementById('structure');
+let current='axis', isolate=false, hidePh=false, spin=false;
+let yaw=0, pitch=0, dragging=false, lastX=0, lastY=0, moved=false;
+
+const rnd = (i,salt=0) => { const x=Math.sin(i*127.1+salt*311.7)*43758.5453; return x-Math.floor(x); };
+const V = () => ({ w:innerWidth, h:innerHeight });
+
+/* density factor: shrinks tiles as the set grows */
+const N   = DATA.length;
+const K   = Math.sqrt(24 / Math.max(N,1));      /* 1.0 at ~24 items, ~0.45 at 120 */
+const COLS = Math.max(4, Math.round(Math.sqrt(N * 1.75)));
+
+const nodes = DATA.map((d,i)=>{
+  const el=document.createElement('div');
+  el.className='item'+(d.placeholder?' ph':'');
+  el.innerHTML=`<img src="${IMG(d.file)}" loading="lazy" alt="">`;
+  el.addEventListener('mouseenter',()=>focus(d,el));
+  el.addEventListener('mouseleave',()=>blur(el));
+  world.appendChild(el);
+  return {d,el,i};
+});
+
+function layout(key){
+  const {w,h}=V(), n=N;
+  const byYear=[...DATA].sort((a,b)=>a.year-b.year);
+
+  nodes.forEach(({d,el},i)=>{
+    let x=0,y=0,z=0,rx=0,ry=0,rz=0,s=1,bw=150*K,bh=95*K;
+
+    switch(key){
+
+      case 'axis':{
+        const rank=byYear.findIndex(o=>o.id===d.id);
+        const span=w*0.80;
+        x = -span/2 + (rank/(n-1))*span;
+        y = (rnd(i)*2-1) * h*0.30;
+        z = (rnd(i,12)*2-1) * 90;
+        bw=132*K; bh=84*K;
+        break;
+      }
+
+      case 'matrix':{
+        const cols=COLS, rows=Math.ceil(n/cols);
+        const cw=138*K, ch=90*K, gap=9*K;
+        x = (i%cols)*(cw+gap) - ((cols-1)*(cw+gap))/2;
+        y = Math.floor(i/cols)*(ch+gap) - ((rows-1)*(ch+gap))/2;
+        bw=cw; bh=ch;
+        break;
+      }
+
+      case 'cloud':{
+        x=(rnd(i,1)*2-1)*w*0.44;
+        y=(rnd(i,2)*2-1)*h*0.38;
+        z=(rnd(i,3)*2-1)*900;
+        ry=(rnd(i,4)*2-1)*18;
+        bw=138*K; bh=88*K;
+        break;
+      }
+
+      case 'orbit':{
+        /* concentric rings so a large set stays legible */
+        const perRing=Math.max(10,Math.round(n/4));
+        const ring=Math.floor(i/perRing), inRing=i%perRing;
+        const a=(inRing/perRing)*Math.PI*2 + ring*0.4;
+        const rr=Math.min(w*0.30,420)+ring*118;
+        x=Math.cos(a)*rr;
+        z=Math.sin(a)*rr*0.74;
+        y=(ring-1.5)*104 + Math.sin(a*2)*20;
+        ry=-a*180/Math.PI+90;
+        bw=158*K; bh=100*K;
+        break;
+      }
+
+      case 'tunnel':{
+        const wall=i%4, step=Math.floor(i/4);
+        const r=330;
+        z = -step*(150*K+40) + 420;
+        if(wall===0){ x=-r; ry= 64; }
+        if(wall===1){ x= r; ry=-64; }
+        if(wall===2){ y=-r*0.60; rx=-58; }
+        if(wall===3){ y= r*0.60; rx= 58; }
+        bw=230*K+70; bh=146*K+44;
+        break;
+      }
+
+      case 'deck':{
+        x=(i-n/2)*(560/n)-40;
+        y=(i-n/2)*(330/n);
+        z=-i*3;
+        rx=52; rz=-38;
+        bw=270*K+60; bh=170*K+38;
+        break;
+      }
+
+      case 'section':{
+        /* two stacked bands so 120 strips still fit the viewport */
+        const band=i%2, idx=Math.floor(i/2), per=Math.ceil(n/2);
+        const span=w*0.90;
+        x=-span/2+(idx/(per-1))*span;
+        y=(band?1:-1)*(70+rnd(i,5)*46);
+        bw=84*K+16; bh=126*K+22;
+        break;
+      }
+
+      case 'radial':{
+        if(i===0){ x=0;y=0;z=200; bw=180*K+40; bh=114*K+26; break; }
+        const a=((i-1)/(n-1))*Math.PI*2*3;      /* spiral out */
+        const rr=110+((i-1)/(n-1))*Math.min(w*0.40,620);
+        x=Math.cos(a)*rr*1.45;
+        y=Math.sin(a)*rr*0.82;
+        z=(rnd(i,7)*2-1)*200;
+        bw=104*K+10; bh=66*K+8;
+        break;
+      }
+
+      case 'canvas':{
+        x=(rnd(i,8)*2-1)*w*0.44;
+        y=(rnd(i,9)*2-1)*h*0.38;
+        rz=(rnd(i,10)*2-1)*8;
+        s=0.6+rnd(i,11)*0.9;
+        bw=176*K+20; bh=112*K+14;
+        break;
+      }
+
+      case 'wall':{
+        const cols=COLS+2;
+        const cw=Math.min(w*0.92/cols,150), ch=cw*0.63;
+        x=(i%cols)*cw-((cols-1)*cw)/2;
+        y=Math.floor(i/cols)*ch-(Math.ceil(n/cols)-1)*ch/2;
+        rx=6; bw=cw-1; bh=ch-1;
+        break;
+      }
+    }
+
+    el.style.width=bw+'px'; el.style.height=bh+'px';
+    el.style.transform=
+      `translate3d(${x-bw/2}px,${y-bh/2}px,${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${s})`;
+    el.style.zIndex=Math.round(3000+z);
+  });
+
+  drawStructure(key);
+  applyFilters();
+}
+
+function drawStructure(key){
+  const {w,h}=V(), cx=w/2, cy=h*0.46, n=N;
+  const L=(a,b,c,d)=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}"/>`;
+  let s='';
+
+  if(key==='axis'){
+    s+=L(w*0.08,cy,w*0.92,cy);
+    const ys=[...DATA].map(d=>d.year), lo=Math.min(...ys), hi=Math.max(...ys);
+    for(let y=Math.ceil(lo/3)*3; y<=hi; y+=3){
+      const px=w*0.10+((y-lo)/(hi-lo))*w*0.80;
+      s+=L(px,cy-8,px,cy+8)+`<text x="${px-12}" y="${cy+22}">${y}</text>`;
+    }
+  }
+  if(key==='matrix'||key==='wall'){
+    const cols = key==='wall'?COLS+2:COLS;
+    const cw = key==='wall'?Math.min(w*0.92/cols,150):147*K;
+    const ch = key==='wall'?cw*0.63:99*K;
+    const rows=Math.ceil(n/cols);
+    for(let c=0;c<=cols;c++){const px=cx+c*cw-(cols*cw)/2;s+=L(px,cy-(rows*ch)/2,px,cy+(rows*ch)/2);}
+    for(let r=0;r<=rows;r++){const py=cy+r*ch-(rows*ch)/2;s+=L(cx-(cols*cw)/2,py,cx+(cols*cw)/2,py);}
+  }
+  if(key==='orbit'){
+    for(let ring=0;ring<4;ring++){
+      const rr=Math.min(w*0.30,420)+ring*118;
+      s+=`<ellipse cx="${cx}" cy="${cy+(ring-1.5)*104}" rx="${rr}" ry="${rr*0.26}"/>`;
+    }
+    s+=`<circle cx="${cx}" cy="${cy}" r="3"/>`;
+  }
+  if(key==='tunnel'){
+    const r=330;
+    s+=`<rect x="${cx-r}" y="${cy-r*0.6}" width="${r*2}" height="${r*1.2}"/>`;
+    s+=`<rect x="${cx-r*0.16}" y="${cy-r*0.1}" width="${r*0.32}" height="${r*0.2}"/>`;
+    [[-1,-0.6],[1,-0.6],[-1,0.6],[1,0.6]].forEach(([a,b])=>
+      s+=L(cx+a*r,cy+b*r,cx+a*r*0.16,cy+b*r*0.16));
+  }
+  if(key==='deck'){
+    s+=L(cx-380,cy+200,cx+380,cy-200)+`<text x="${cx+300}" y="${cy-212}">STACK AXIS</text>`;
+  }
+  if(key==='section'){
+    s+=L(w*0.04,cy,w*0.96,cy)+L(w*0.04,cy-3,w*0.96,cy-3);
+    s+=`<text x="${w*0.04}" y="${cy+24}">GROUND LINE</text>`;
+  }
+  if(key==='radial'){
+    for(let i=1;i<n;i+=2){
+      const a=((i-1)/(n-1))*Math.PI*2*3;
+      const rr=110+((i-1)/(n-1))*Math.min(w*0.40,620);
+      s+=L(cx,cy,cx+Math.cos(a)*rr*1.45,cy+Math.sin(a)*rr*0.82);
+    }
+    s+=`<circle cx="${cx}" cy="${cy}" r="5"/>`;
+  }
+  if(key==='canvas'){ s+=`<text x="${cx-62}" y="${cy}">NO STRUCTURE</text>`; }
+
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  svg.innerHTML=s;
+}
+
+function applyFilters(){
+  let match=0, shown=0;
+  nodes.forEach(({d,el})=>{
+    const isMatch = d.geometry===current;
+    if(isMatch) match++;
+    const hidden = (isolate && !isMatch) || (hidePh && d.placeholder);
+    el.classList.toggle('dim', hidden);
+    if(!hidden) shown++;
+  });
+  document.getElementById('count').innerHTML =
+    `<b>${match}</b>/${N} use <b>${current.toUpperCase()}</b> · ${shown} visible · `+
+    `${STATS.real} real + ${STATS.placeholder} placeholder`;
+}
+
+function focus(d,el){
+  el.classList.add('hot');
+  const keys=['geometry','orderedBy','navigation','dimension','medium','density','structure','effort','register'];
+  document.getElementById('readout').innerHTML =
+    (d.placeholder?`<span class="flag">▲ PLACEHOLDER SLOT</span>`:``)+
+    `<span class="t">${d.title.toUpperCase()}</span>`+
+    `<div class="row"><i>id</i><b>${d.id} · ${d.year}</b></div>`+
+    keys.map(k=>`<div class="row"><i>${FIELD_LABELS[k]}</i><b>${d[k]}</b></div>`).join('');
+}
+function blur(el){ el.classList.remove('hot'); document.getElementById('readout').innerHTML=''; }
+
+function setGeo(key){
+  current=key;
+  document.querySelectorAll('.geo').forEach(g=>g.classList.toggle('on',g.dataset.k===key));
+  const dsc=document.getElementById('desc');
+  dsc.style.opacity=0;
+  setTimeout(()=>{
+    dsc.innerHTML=`<b>${key.toUpperCase()}</b> — ${GEOS.find(g=>g.key===key).note}`;
+    dsc.style.opacity=1;
+  },200);
+  layout(key);
+}
+
+document.getElementById('geos').innerHTML=GEOS.map((g,i)=>{
+  const c=DATA.filter(d=>d.geometry===g.key).length;
+  return `<div class="geo" data-k="${g.key}"><span class="k">${(i+1)%10}</span>
+          <span class="n">${g.key}</span><span class="c">${String(c).padStart(3,'0')}</span></div>`;
+}).join('');
+document.querySelectorAll('.geo').forEach(g=>g.addEventListener('click',()=>setGeo(g.dataset.k)));
+
+const bind=(id,fn)=>{const el=document.getElementById(id);
+  el.addEventListener('click',()=>{el.classList.toggle('on');fn(el.classList.contains('on'));});};
+bind('sw-iso', v=>{isolate=v; applyFilters();});
+bind('sw-str', v=>svg.classList.toggle('on',v));
+bind('sw-spin',v=>{spin=v; if(!v){yaw=pitch=0; applyWorld();}});
+bind('sw-ph',  v=>{hidePh=v; applyFilters();});
+svg.classList.add('on');
+
+function applyWorld(){ world.style.transform=`rotateX(${pitch}deg) rotateY(${yaw}deg)`; }
+addEventListener('mousedown',e=>{dragging=true;moved=false;lastX=e.clientX;lastY=e.clientY;});
+addEventListener('mouseup',()=>dragging=false);
+addEventListener('mousemove',e=>{
+  if(!dragging)return; moved=true;
+  yaw+=(e.clientX-lastX)*0.2;
+  pitch=Math.max(-45,Math.min(45,pitch-(e.clientY-lastY)*0.12));
+  lastX=e.clientX; lastY=e.clientY;
+  applyWorld();
+});
+setInterval(()=>{ if(spin&&!dragging){ yaw+=0.14; applyWorld(); } },32);
+
+addEventListener('keydown',e=>{
+  const i=e.key==='0'?9:parseInt(e.key,10)-1;
+  if(!isNaN(i)&&GEOS[i]) setGeo(GEOS[i].key);
+});
+addEventListener('resize',()=>layout(current));
+setGeo('axis');
+</script>
+</body>
+</html>

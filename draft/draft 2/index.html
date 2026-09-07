@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draft 2 — Design Space</title>
+<style>
+  :root{
+    --bg:#eeece6; --panel:#e4e1d8; --fg:#14140f; --dim:#8a8878;
+    --line:#c9c5b8; --hot:#d9330a; --gap:#b9241f;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--mono);
+       font-size:11px;letter-spacing:.04em;overflow:hidden}
+
+  /* ---------- top bar ---------- */
+  #bar{position:fixed;top:0;left:0;right:0;height:52px;z-index:30;
+       border-bottom:1px solid var(--line);background:var(--panel);
+       display:flex;align-items:center;gap:26px;padding:0 20px}
+  .brand{font-size:10px;letter-spacing:.2em;line-height:1.5}
+  .brand i{font-style:normal;color:var(--dim);display:block;font-size:8px}
+
+  .sel{display:flex;align-items:center;gap:7px}
+  .sel label{font-size:8px;color:var(--dim);letter-spacing:.16em}
+  select{font:inherit;font-size:10px;letter-spacing:.1em;background:var(--bg);
+    color:var(--fg);border:1px solid var(--line);padding:4px 8px;border-radius:0;
+    cursor:pointer;text-transform:uppercase}
+  select:hover{border-color:var(--fg)}
+  .swapbtn{border:1px solid var(--line);background:var(--bg);color:var(--dim);
+    padding:5px 9px;cursor:pointer;font:inherit;font-size:10px;letter-spacing:.1em}
+  .swapbtn:hover{border-color:var(--fg);color:var(--fg)}
+
+  .chips{display:flex;gap:1px;margin-left:auto}
+  .chip{padding:5px 9px;border:1px solid var(--line);color:var(--dim);
+    cursor:pointer;font-size:9px;letter-spacing:.12em;user-select:none;background:var(--bg)}
+  .chip:hover{color:var(--fg)}
+  .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+  /* ---------- plot ---------- */
+  #plot{position:fixed;top:52px;left:0;right:264px;bottom:0;overflow:hidden}
+  #grid{position:absolute;inset:0}
+  .cell{position:absolute;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .cell.empty{background:repeating-linear-gradient(45deg,transparent,transparent 5px,
+    rgba(185,36,31,.07) 5px,rgba(185,36,31,.07) 6px)}
+  .cell.empty.flag{outline:1px dashed var(--gap);outline-offset:-2px}
+  .cell .n{position:absolute;right:3px;bottom:2px;font-size:8px;color:var(--dim);opacity:.7}
+  .cell.hover{background:rgba(217,51,10,.07)}
+
+  .tile{position:absolute;overflow:hidden;cursor:pointer;
+    transition:transform .55s cubic-bezier(.22,.9,.24,1),left .55s,top .55s,
+               width .55s,height .55s,opacity .3s,box-shadow .2s}
+  .tile img{display:block;width:100%;height:100%;object-fit:cover;
+    border:.5px solid rgba(0,0,0,.22)}
+  .tile.ph img{opacity:.42;filter:grayscale(.7)}
+  .tile.hot{z-index:500;transform:scale(2.9);box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  .tile.hot img{border:1px solid var(--hot);opacity:1;filter:none}
+  .tile.mute{opacity:.13}
+
+  /* density mode */
+  .blob{position:absolute;background:var(--fg);transition:.5s;pointer-events:none}
+  .blobn{position:absolute;font-size:9px;color:var(--fg);pointer-events:none}
+
+  /* ---------- axis labels ---------- */
+  .xl,.yl{position:absolute;font-size:9px;letter-spacing:.12em;color:var(--dim);
+    text-transform:uppercase;pointer-events:none}
+  .xl{bottom:6px;text-align:center}
+  .yl{left:7px;transform-origin:left center}
+  .axname{position:absolute;font-size:9px;letter-spacing:.2em;color:var(--fg)}
+  #axX{bottom:6px;right:14px}
+  #axY{top:12px;left:10px}
+
+  /* ---------- side ---------- */
+  #side{position:fixed;top:52px;right:0;bottom:0;width:264px;z-index:20;
+    border-left:1px solid var(--line);background:var(--panel);padding:16px;
+    display:flex;flex-direction:column}
+  #prev{width:100%;aspect-ratio:16/10;background:#d5d1c6;border:1px solid var(--line);
+    margin-bottom:12px;overflow:hidden}
+  #prev img{width:100%;height:100%;object-fit:cover;display:block}
+  #meta{font-size:9px;line-height:1.85;color:var(--dim);flex:1;overflow:auto}
+  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.09em;display:block;margin-bottom:9px}
+  #meta .row{display:flex;justify-content:space-between;gap:10px;
+    border-bottom:1px solid rgba(0,0,0,.06);padding:2px 0}
+  #meta .row b{color:var(--fg);font-weight:400}
+  #meta .flag{color:var(--hot);display:block;margin-bottom:6px;font-size:9px}
+  #stats{border-top:1px solid var(--line);padding-top:10px;margin-top:10px;
+    font-size:9px;color:var(--dim);line-height:1.8}
+  #stats b{color:var(--fg);font-weight:400}
+  #stats .gapline{color:var(--gap)}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div class="brand">256 / DRAFT 02<i>DESIGN SPACE — PLOT ANY FIELD AGAINST ANY OTHER</i></div>
+  <div class="sel"><label>Y</label><select id="ySel"></select></div>
+  <button class="swapbtn" id="swap">⇄ SWAP</button>
+  <div class="sel"><label>X</label><select id="xSel"></select></div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div id="plot">
+  <div id="grid"></div>
+  <div class="axname" id="axX"></div>
+  <div class="axname" id="axY"></div>
+</div>
+
+<div id="side">
+  <div id="prev"></div>
+  <div id="meta"></div>
+  <div id="stats"></div>
+</div>
+
+<script src="../assets/data.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   Every item has 11 categorical fields. Any two of them make a plane.
+   The empty cells are the argument: they are the layouts nobody built.
+------------------------------------------------------------------ */
+
+const PLOTTABLE = ['geometry','orderedBy','navigation','dimension','medium',
+                   'density','structure','effort','ground','field','register'];
+
+let xKey='dimension', yKey='geometry';
+let mode='tiles';           /* tiles | density */
+let flagGaps=true;
+let registerFilter=null;
+
+const grid=document.getElementById('grid');
+
+/* ---------- controls ---------- */
+const opts = k => PLOTTABLE.map(f=>
+  `<option value="${f}" ${f===k?'selected':''}>${FIELD_LABELS[f]}</option>`).join('');
+document.getElementById('xSel').innerHTML=opts(xKey);
+document.getElementById('ySel').innerHTML=opts(yKey);
+document.getElementById('xSel').onchange=e=>{xKey=e.target.value;render();};
+document.getElementById('ySel').onchange=e=>{yKey=e.target.value;render();};
+document.getElementById('swap').onclick=()=>{
+  [xKey,yKey]=[yKey,xKey];
+  document.getElementById('xSel').value=xKey;
+  document.getElementById('ySel').value=yKey;
+  render();
+};
+
+const CHIPS=[
+  {id:'density', label:'DENSITY VIEW'},
+  {id:'gaps',    label:'FLAG GAPS'},
+  ...FIELDS.register.map(r=>({id:'reg:'+r, label:r.toUpperCase()})),
+];
+document.getElementById('chips').innerHTML=CHIPS.map(c=>
+  `<div class="chip${c.id==='gaps'?' on':''}" data-id="${c.id}">${c.label}</div>`).join('');
+document.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+  const id=ch.dataset.id;
+  if(id==='density'){ mode = mode==='tiles'?'density':'tiles'; ch.classList.toggle('on'); }
+  else if(id==='gaps'){ flagGaps=!flagGaps; ch.classList.toggle('on'); }
+  else{
+    const r=id.slice(4);
+    registerFilter = registerFilter===r ? null : r;
+    document.querySelectorAll('.chip[data-id^="reg:"]').forEach(c=>
+      c.classList.toggle('on', c.dataset.id==='reg:'+registerFilter));
+  }
+  render();
+});
+
+/* ---------- render ---------- */
+function render(){
+  const W=grid.clientWidth, H=grid.clientHeight;
+  const PAD={l:96,r:16,t:16,b:38};
+  const xs=FIELDS[xKey], ys=FIELDS[yKey];
+  const cw=(W-PAD.l-PAD.r)/xs.length;
+  const ch=(H-PAD.t-PAD.b)/ys.length;
+
+  let html='';
+
+  /* cells */
+  let filled=0, empties=[];
+  ys.forEach((yv,r)=>xs.forEach((xv,c)=>{
+    const items=DATA.filter(d=>d[xKey]===xv&&d[yKey]===yv);
+    const n=items.length;
+    if(n) filled++; else empties.push(`${xv} × ${yv}`);
+    html+=`<div class="cell ${n?'':'empty'} ${(!n&&flagGaps)?'flag':''}"
+      style="left:${PAD.l+c*cw}px;top:${PAD.t+r*ch}px;width:${cw}px;height:${ch}px"
+      data-x="${xv}" data-y="${yv}">${n?`<span class="n">${n}</span>`:''}</div>`;
+  }));
+
+  /* axis labels */
+  xs.forEach((xv,c)=>
+    html+=`<div class="xl" style="left:${PAD.l+c*cw}px;width:${cw}px">${xv}</div>`);
+  ys.forEach((yv,r)=>
+    html+=`<div class="yl" style="top:${PAD.t+r*ch+ch/2-5}px">${yv}</div>`);
+
+  /* content */
+  ys.forEach((yv,r)=>xs.forEach((xv,c)=>{
+    const items=DATA.filter(d=>d[xKey]===xv&&d[yKey]===yv);
+    if(!items.length) return;
+    const x0=PAD.l+c*cw, y0=PAD.t+r*ch;
+
+    if(mode==='density'){
+      const a=Math.min(1,items.length/8);
+      const size=Math.min(cw,ch)*0.72*Math.sqrt(a);
+      html+=`<div class="blob" style="left:${x0+cw/2-size/2}px;top:${y0+ch/2-size/2}px;
+        width:${size}px;height:${size}px;opacity:${0.22+a*0.6}"></div>`;
+      html+=`<div class="blobn" style="left:${x0+cw/2-6}px;top:${y0+ch/2+size/2+3}px">${items.length}</div>`;
+      return;
+    }
+
+    /* pack the cell with a mini grid */
+    const cols=Math.ceil(Math.sqrt(items.length*1.5));
+    const rows=Math.ceil(items.length/cols);
+    const pad=3;
+    const tw=(cw-pad*2)/cols, th=Math.min((ch-pad*2)/rows, tw*0.66);
+    items.forEach((d,i)=>{
+      const muted = registerFilter && d.register!==registerFilter;
+      html+=`<div class="tile ${d.placeholder?'ph':''} ${muted?'mute':''}" data-id="${d.id}"
+        style="left:${x0+pad+(i%cols)*tw}px;top:${y0+pad+Math.floor(i/cols)*th}px;
+               width:${tw-1}px;height:${th-1}px">
+        <img src="${IMG(d.file)}" loading="lazy" alt=""></div>`;
+    });
+  }));
+
+  grid.innerHTML=html;
+  document.getElementById('axX').textContent='X → '+FIELD_LABELS[xKey].toUpperCase();
+  document.getElementById('axY').textContent='Y ↓ '+FIELD_LABELS[yKey].toUpperCase();
+
+  const total=xs.length*ys.length;
+  document.getElementById('stats').innerHTML=
+    `<b>${DATA.length}</b> items · ${STATS.real} real + ${STATS.placeholder} placeholder<br>
+     <b>${filled}</b>/${total} cells occupied (${Math.round(filled/total*100)}%)<br>
+     <span class="gapline"><b>${total-filled}</b> empty — layouts nobody has built</span>`;
+
+  /* interaction */
+  grid.querySelectorAll('.tile').forEach(t=>{
+    const d=DATA.find(o=>o.id===t.dataset.id);
+    t.onmouseenter=()=>{t.classList.add('hot');show(d);};
+    t.onmouseleave=()=>t.classList.remove('hot');
+  });
+  grid.querySelectorAll('.cell').forEach(c=>{
+    c.onmouseenter=()=>{
+      c.classList.add('hover');
+      const items=DATA.filter(d=>d[xKey]===c.dataset.x&&d[yKey]===c.dataset.y);
+      if(!items.length) showGap(c.dataset.x,c.dataset.y);
+    };
+    c.onmouseleave=()=>c.classList.remove('hover');
+  });
+}
+
+function show(d){
+  document.getElementById('prev').innerHTML=`<img src="${IMG(d.file)}" alt="">`;
+  document.getElementById('meta').innerHTML=
+    (d.placeholder?`<span class="flag">▲ PLACEHOLDER SLOT</span>`:``)+
+    `<span class="t">${d.title.toUpperCase()}</span>`+
+    `<div class="row"><span>id</span><b>${d.id} · ${d.year}</b></div>`+
+    PLOTTABLE.map(k=>`<div class="row"><span>${FIELD_LABELS[k]}</span><b>${d[k]}</b></div>`).join('');
+}
+function showGap(x,y){
+  document.getElementById('prev').innerHTML='';
+  document.getElementById('meta').innerHTML=
+    `<span class="t" style="color:var(--gap)">EMPTY CELL</span>
+     <div class="row"><span>${FIELD_LABELS[xKey]}</span><b>${x}</b></div>
+     <div class="row"><span>${FIELD_LABELS[yKey]}</span><b>${y}</b></div>
+     <p style="margin-top:12px;line-height:1.8">No precedent in the set combines these.
+     Either nobody has built it, or you have not found it yet. This is where your
+     own project can sit.</p>`;
+}
+
+addEventListener('resize',render);
+render();
+</script>
+</body>
+</html>

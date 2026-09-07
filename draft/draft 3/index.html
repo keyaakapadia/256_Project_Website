@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draft 3 — Coordinate Space</title>
+<style>
+  :root{
+    --bg:#050506; --fg:#e8e8e4; --dim:#5a5a63; --line:#1c1c21;
+    --hot:#38e08a; --warn:#ff4d2e;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--mono);
+       font-size:11px;letter-spacing:.06em;overflow:hidden}
+
+  /* ---------- header ---------- */
+  #head{position:fixed;top:0;left:0;right:300px;height:56px;z-index:30;
+    border-bottom:1px solid var(--line);display:flex;align-items:center;
+    gap:22px;padding:0 20px}
+  .brand{font-size:10px;letter-spacing:.2em;line-height:1.55}
+  .brand i{font-style:normal;color:var(--dim);display:block;font-size:8px}
+
+  #addr{display:flex;align-items:center;gap:8px}
+  #addr label{font-size:8px;color:var(--dim);letter-spacing:.16em}
+  #cmd{font:inherit;font-size:15px;letter-spacing:.2em;background:#0d0d10;
+    color:var(--hot);border:1px solid var(--line);padding:5px 10px;width:88px;
+    text-transform:uppercase;outline:none}
+  #cmd:focus{border-color:var(--hot)}
+
+  .sw{display:flex;align-items:center;gap:7px;color:var(--dim);cursor:pointer;user-select:none}
+  .sw:hover{color:var(--fg)}
+  .sw .box{width:10px;height:10px;border:1px solid #2e2e36}
+  .sw.on .box{background:var(--warn);border-color:var(--warn)}
+  .sw.on{color:var(--fg)}
+  .sw span{font-size:9px;letter-spacing:.12em}
+  .btn{border:1px solid var(--line);background:#0d0d10;color:var(--dim);
+    padding:6px 10px;cursor:pointer;font:inherit;font-size:9px;letter-spacing:.14em}
+  .btn:hover{color:var(--fg);border-color:var(--fg)}
+
+  #progress{margin-left:auto;text-align:right;font-size:9px;color:var(--dim);line-height:1.6}
+  #progress b{color:var(--hot);font-weight:400;font-size:15px;letter-spacing:.1em}
+
+  /* ---------- field ---------- */
+  #field{position:fixed;top:56px;left:0;right:300px;bottom:44px;
+    display:flex;align-items:center;justify-content:center}
+  #board{position:relative;transition:width .6s,height .6s}
+
+  .c{position:absolute;border:1px solid var(--line);transition:
+     background .35s, border-color .25s, opacity .5s;overflow:hidden}
+  .c .thumb{position:absolute;inset:0;opacity:0;transition:opacity .5s}
+  .c .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .c.seen .thumb{opacity:.82}
+  .c.seen.empty{background:#0b0b0e}
+  .c.seen.empty::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;
+    background:#26262c;transform:translate(-50%,-50%)}
+  .c.flash .thumb{opacity:.95}
+  .c.flash{border-color:var(--hot)}
+  .c.cursor{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot),0 0 22px rgba(56,224,138,.35);z-index:50}
+  .c.cursor .thumb{opacity:1}
+  .c .adj{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    font-size:9px;color:#3a3a44;pointer-events:none}
+
+  /* rulers */
+  .ruler{position:absolute;color:var(--dim);font-size:8px;letter-spacing:.1em;pointer-events:none}
+  .ruler.on{color:var(--hot)}
+
+  /* ---------- side ---------- */
+  #side{position:fixed;top:0;right:0;bottom:0;width:300px;z-index:20;
+    border-left:1px solid var(--line);padding:18px;display:flex;flex-direction:column}
+  #prev{width:100%;aspect-ratio:16/10;background:#0b0b0e;border:1px solid var(--line);
+    overflow:hidden;margin-bottom:14px;display:flex;align-items:center;
+    justify-content:center;color:var(--dim);font-size:9px;letter-spacing:.16em}
+  #prev img{width:100%;height:100%;object-fit:cover;display:block}
+  #meta{font-size:9px;line-height:1.8;color:var(--dim);flex:1;overflow:auto}
+  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.09em;display:block;margin-bottom:9px}
+  #meta .row{display:flex;justify-content:space-between;gap:10px;
+    border-bottom:1px solid rgba(255,255,255,.05);padding:2px 0}
+  #meta .row b{color:var(--fg);font-weight:400}
+  #meta .flag{color:var(--warn);display:block;margin-bottom:6px}
+  #meta .empty{color:var(--dim);line-height:1.9}
+  #sensor{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;
+    font-size:9px;color:var(--dim);line-height:1.9}
+  #sensor .big{color:var(--hot);font-size:26px;letter-spacing:.06em;display:block;margin:2px 0 4px}
+
+  #foot{position:fixed;left:0;right:300px;bottom:0;height:44px;z-index:30;
+    border-top:1px solid var(--line);display:flex;align-items:center;
+    padding:0 20px;gap:20px;color:var(--dim);font-size:9px;letter-spacing:.12em}
+  #shout{color:var(--warn);opacity:0;transition:opacity .4s}
+  #shout.on{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="head">
+  <div class="brand">256 / DRAFT 03<i>COORDINATE SPACE — NO MENU, ONLY ADDRESSES</i></div>
+  <div id="addr"><label>GO TO</label><input id="cmd" placeholder="A1" maxlength="4"></div>
+  <button class="btn" id="reveal">REVEAL 1s</button>
+  <div class="sw" id="sw-comp"><div class="box"></div><span>COMPRESS</span></div>
+  <div class="sw" id="sw-trans"><div class="box"></div><span>TRANSPOSE</span></div>
+  <div id="progress"><b id="found">000</b><br>OF <span id="tot"></span> FOUND</div>
+</div>
+
+<div id="field"><div id="board"></div></div>
+
+<div id="side">
+  <div id="prev">NOTHING SELECTED</div>
+  <div id="meta"></div>
+  <div id="sensor"></div>
+</div>
+
+<div id="foot">
+  <span>↑↓←→ / WASD MOVE</span>
+  <span>TYPE AN ADDRESS + ENTER</span>
+  <span>THE FIELD IS DARK — DEDUCE WHERE THE CONTENT IS</span>
+  <span id="shout"></span>
+</div>
+
+<script src="../assets/data.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   A grid with no menu. Content sits at addresses you cannot see.
+   The status panel tells you only how many of the eight neighbouring
+   cells are occupied — you find the archive by inference.
+   COMPRESS and TRANSPOSE rewrite every address you have memorised.
+------------------------------------------------------------------ */
+
+let COLS=20, ROWS=10;
+let compressed=false, transposed=false;
+let cx=0, cy=0;
+let placement=[];                 /* index -> item | null */
+const visited=new Set();
+
+const LETTER = c => String.fromCharCode(65+c);
+const idx = (x,y) => y*COLS + x;
+const addrOf = (x,y) => LETTER(x)+(y+1);
+
+/* ---------- deterministic placement ---------- */
+function seeded(i){ const x=Math.sin(i*127.1+311.7)*43758.5453; return x-Math.floor(x); }
+
+function buildPlacement(){
+  const total=COLS*ROWS;
+  placement=new Array(total).fill(null);
+
+  if(compressed){
+    /* every empty cell removed — the archive packs to the front */
+    DATA.forEach((d,i)=>{ if(i<total) placement[i]=d; });
+  } else {
+    /* scatter deterministically across the whole field */
+    const slots=[...Array(total).keys()]
+      .map(i=>({i,k:seeded(i+1)}))
+      .sort((a,b)=>a.k-b.k)
+      .slice(0,DATA.length)
+      .map(o=>o.i);
+    slots.forEach((slot,n)=>placement[slot]=DATA[n]);
+  }
+
+  if(transposed){
+    const t=new Array(total).fill(null);
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      const nx=y%COLS, ny=x%ROWS;      /* fold the transpose back into the field */
+      t[ny*COLS+nx]=placement[y*COLS+x];
+    }
+    placement=t;
+  }
+}
+
+/* ---------- render ---------- */
+const board=document.getElementById('board');
+
+function sizeBoard(){
+  const fw=document.getElementById('field').clientWidth-60;
+  const fh=document.getElementById('field').clientHeight-60;
+  const cell=Math.floor(Math.min(fw/COLS, fh/ROWS));
+  board.style.width =(cell*COLS)+'px';
+  board.style.height=(cell*ROWS)+'px';
+  return cell;
+}
+
+function render(){
+  const cell=sizeBoard();
+  let html='';
+
+  for(let y=0;y<ROWS;y++){
+    for(let x=0;x<COLS;x++){
+      const i=idx(x,y), d=placement[i], seen=visited.has(i);
+      const cls=['c'];
+      if(seen) cls.push('seen');
+      if(seen && !d) cls.push('empty');
+      if(x===cx&&y===cy) cls.push('cursor');
+      html+=`<div class="${cls.join(' ')}" data-i="${i}"
+        style="left:${x*cell}px;top:${y*cell}px;width:${cell}px;height:${cell}px">
+        ${d?`<div class="thumb"><img src="${IMG(d.file)}" loading="lazy" alt=""></div>`:''}
+      </div>`;
+    }
+  }
+
+  /* rulers */
+  for(let x=0;x<COLS;x++)
+    html+=`<div class="ruler ${x===cx?'on':''}" style="left:${x*cell+cell/2-4}px;top:-16px">${LETTER(x)}</div>`;
+  for(let y=0;y<ROWS;y++)
+    html+=`<div class="ruler ${y===cy?'on':''}" style="left:-18px;top:${y*cell+cell/2-5}px">${y+1}</div>`;
+
+  board.innerHTML=html;
+  board.querySelectorAll('.c').forEach(c=>c.onclick=()=>{
+    const i=+c.dataset.i; cx=i%COLS; cy=Math.floor(i/COLS); step();
+  });
+}
+
+/* ---------- movement ---------- */
+function step(){
+  const i=idx(cx,cy);
+  const wasNew = !visited.has(i);
+  visited.add(i);
+  const d=placement[i];
+  if(wasNew && d) flash(`FOUND ${d.id.toUpperCase()} AT ${addrOf(cx,cy)}`);
+  render();
+  panel(d);
+  sensor();
+}
+
+function neighbours(){
+  let n=0;
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    if(!dx&&!dy) continue;
+    const x=cx+dx, y=cy+dy;
+    if(x<0||y<0||x>=COLS||y>=ROWS) continue;
+    if(placement[idx(x,y)]) n++;
+  }
+  return n;
+}
+
+function sensor(){
+  const n=neighbours();
+  const foundCount=[...visited].filter(i=>placement[i]).length;
+  document.getElementById('found').textContent=String(foundCount).padStart(3,'0');
+  document.getElementById('tot').textContent=DATA.length;
+  document.getElementById('sensor').innerHTML=
+    `ADDRESS <b style="color:var(--hot)">${addrOf(cx,cy)}</b><br>
+     OCCUPIED NEIGHBOURS<span class="big">${n}</span>
+     ${n===0?'nothing adjacent — move on':'content is touching this cell'}<br>
+     <span style="opacity:.6">${visited.size} of ${COLS*ROWS} cells opened</span>`;
+}
+
+function panel(d){
+  const prev=document.getElementById('prev'), meta=document.getElementById('meta');
+  if(!d){
+    prev.innerHTML='EMPTY CELL';
+    meta.innerHTML=`<span class="t">${addrOf(cx,cy)} — EMPTY</span>
+      <p class="empty">Nothing is stored here. An empty cell still costs you a move:
+      that is what a coordinate system charges for the promise that everything
+      has an address.</p>`;
+    return;
+  }
+  prev.innerHTML=`<img src="${IMG(d.file)}" alt="">`;
+  const keys=['geometry','orderedBy','navigation','dimension','medium',
+              'density','structure','effort','ground','field','register'];
+  meta.innerHTML=
+    (d.placeholder?`<span class="flag">▲ PLACEHOLDER SLOT</span>`:``)+
+    `<span class="t">${d.title.toUpperCase()}</span>
+     <div class="row"><span>address</span><b>${addrOf(cx,cy)}</b></div>
+     <div class="row"><span>id</span><b>${d.id} · ${d.year}</b></div>`+
+    keys.map(k=>`<div class="row"><span>${FIELD_LABELS[k]}</span><b>${d[k]}</b></div>`).join('');
+}
+
+let shoutT;
+function flash(msg){
+  const s=document.getElementById('shout');
+  s.textContent=msg; s.classList.add('on');
+  clearTimeout(shoutT); shoutT=setTimeout(()=>s.classList.remove('on'),1800);
+}
+
+/* ---------- controls ---------- */
+addEventListener('keydown',e=>{
+  if(document.activeElement===document.getElementById('cmd')) return;
+  const k=e.key.toLowerCase();
+  let moved=true;
+  if(k==='arrowleft' ||k==='a') cx=Math.max(0,cx-1);
+  else if(k==='arrowright'||k==='d') cx=Math.min(COLS-1,cx+1);
+  else if(k==='arrowup'   ||k==='w') cy=Math.max(0,cy-1);
+  else if(k==='arrowdown' ||k==='s') cy=Math.min(ROWS-1,cy+1);
+  else moved=false;
+  if(moved){ e.preventDefault(); step(); }
+});
+
+document.getElementById('cmd').addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  const v=e.target.value.trim().toUpperCase();
+  const m=v.match(/^([A-Z])(\d{1,2})$/);
+  if(!m){ flash('BAD ADDRESS'); return; }
+  const x=m[1].charCodeAt(0)-65, y=parseInt(m[2],10)-1;
+  if(x<0||x>=COLS||y<0||y>=ROWS){ flash(`${v} IS OUTSIDE THE FIELD`); return; }
+  cx=x; cy=y; e.target.value=''; e.target.blur(); step();
+});
+
+document.getElementById('reveal').onclick=()=>{
+  board.querySelectorAll('.c').forEach(c=>{
+    if(placement[+c.dataset.i]) c.classList.add('flash');
+  });
+  flash('REVEALED — MEMORISE IT');
+  setTimeout(()=>board.querySelectorAll('.c').forEach(c=>c.classList.remove('flash')),1200);
+};
+
+const bind=(id,fn)=>{const el=document.getElementById(id);
+  el.onclick=()=>{el.classList.toggle('on');fn(el.classList.contains('on'));};};
+
+bind('sw-comp',v=>{
+  compressed=v; buildPlacement(); render(); sensor(); panel(placement[idx(cx,cy)]);
+  flash(v?'COMPRESSED — EVERY ADDRESS YOU LEARNED IS NOW WRONG':'RESTORED');
+});
+bind('sw-trans',v=>{
+  transposed=v; buildPlacement(); render(); sensor(); panel(placement[idx(cx,cy)]);
+  flash(v?'TRANSPOSED — ROWS AND COLUMNS HAVE SWAPPED':'RESTORED');
+});
+
+addEventListener('resize',render);
+
+buildPlacement();
+render();
+step();
+</script>
+</body>
+</html>

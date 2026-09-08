@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>256 — The Lattice</title>
+<style>
+  :root{
+    --bg:#07070a; --fg:#eeece8; --dim:#5e5e69; --line:#1e1e25;
+    --hot:#ff4d2e; --ok:#38e08a; --wire:rgba(255,255,255,.16);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--mono);
+       font-size:11px;letter-spacing:.05em;overflow:hidden}
+
+  #stage{position:fixed;inset:0;perspective:2200px;perspective-origin:50% 46%}
+  #world{position:absolute;left:50%;top:46%;transform-style:preserve-3d;
+    transition:transform .5s cubic-bezier(.22,.9,.24,1)}
+
+  .cellw{position:absolute;border:1px solid var(--wire);transform-style:preserve-3d;
+    pointer-events:none;transition:opacity .4s}
+  .it{position:absolute;transform-style:preserve-3d;cursor:pointer;
+    transition:transform .9s cubic-bezier(.22,.9,.24,1),opacity .4s}
+  .it img{display:block;width:100%;height:100%;object-fit:cover;background:#1a1a20;
+    border:1px solid rgba(255,255,255,.14)}
+  .it.dim{opacity:.05}
+  .it.hot img{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot),0 0 34px rgba(255,77,46,.5)}
+  .it .d{position:absolute;left:0;bottom:-3px;height:2px;background:var(--hot);opacity:.9}
+
+  #vec{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .4s}
+  #vec.on{opacity:1}
+  #vec line{stroke:var(--hot);stroke-width:1;opacity:.34;vector-effect:non-scaling-stroke}
+
+  .rail{position:fixed;z-index:9000}
+  #left{left:18px;top:16px;width:222px}
+  .brand{font-size:10px;letter-spacing:.19em;line-height:1.55}
+  .brand i{font-style:normal;color:var(--dim);display:block;font-size:8px;margin-top:3px}
+  .grp{margin-top:16px}
+  .grp h4{font-size:8px;letter-spacing:.18em;color:var(--dim);margin:0 0 7px;font-weight:400}
+  .btn{border:1px solid var(--line);background:#0d0d12;color:var(--dim);padding:5px 8px;
+    cursor:pointer;font:inherit;font-size:9px;letter-spacing:.11em;margin:0 1px 2px 0}
+  .btn:hover{color:var(--fg);border-color:var(--fg)}
+  .btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  input[type=range]{width:100%;accent-color:var(--hot);margin-top:6px}
+  .axline{display:flex;justify-content:space-between;font-size:8px;color:var(--dim);margin-top:9px;
+    border-top:1px solid var(--line);padding-top:7px;line-height:1.7}
+  .axline b{color:var(--fg);font-weight:400}
+
+  #right{right:18px;top:16px;width:236px;text-align:right}
+  #meta{color:var(--dim);font-size:9px;line-height:1.75;min-height:150px}
+  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.08em;display:block;margin-bottom:8px;line-height:1.5}
+  #meta .row{display:flex;justify-content:flex-end;gap:9px}
+  #meta .row i{font-style:normal;opacity:.45;min-width:70px}
+  #meta b{color:var(--fg);font-weight:400}
+  #meta .push{color:var(--hot)}
+
+  #why{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9000;
+    width:min(790px,74vw);text-align:center;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(7,7,10,.985) 0%,rgba(7,7,10,.95) 55%,rgba(7,7,10,0) 100%);
+    padding:18px 32px 12px}
+  #why .hd{font-size:10px;letter-spacing:.24em;margin-bottom:9px}
+  #why .bd{font-size:10px;line-height:1.95;color:#b6b6c0}
+  #why .bd b{color:var(--fg);font-weight:400}
+  #stat{position:fixed;right:18px;bottom:18px;z-index:9000;font-size:9px;color:var(--dim);
+    text-align:right;line-height:1.75}
+  #stat b{color:var(--fg);font-weight:400}
+  #stat .bad{color:var(--hot)}
+</style>
+</head>
+<body>
+
+<div id="stage"><div id="world"></div></div>
+<svg id="vec"></svg>
+
+<div class="rail" id="left">
+  <div class="brand">256 / DRAFT 04 — THE LATTICE<i>8 × 8 × 4 = 256. one slot per address.</i></div>
+
+  <div class="grp"><h4>SLICE</h4>
+    <button class="btn on" data-sl="none">WHOLE</button>
+    <button class="btn" data-sl="x">BY RANK</button>
+    <button class="btn" data-sl="y">BY SUBJECT</button>
+    <button class="btn" data-sl="z">BY FORMAT</button>
+    <input type="range" id="slider" min="0" max="7" value="0" disabled>
+    <div class="axline"><span id="slLabel">showing all 4 layers · scroll to zoom</span></div>
+  </div>
+
+  <div class="grp"><h4>VIEW</h4>
+    <button class="btn" id="bExp">EXPLODE LAYERS</button>
+    <button class="btn on" id="bWire">WIREFRAME</button>
+    <button class="btn on" id="bVec">SHOW DISPLACEMENT</button>
+    <button class="btn" id="bTrue">RELEASE TO TRUE POSITION</button>
+  </div>
+
+  <div class="axline">
+    <div style="text-align:left">
+      X <b>rank octile</b> — order → chaos<br>
+      Y <b>subject group</b> — 8 families<br>
+      Z <b>format</b> — portrait / square / landscape / wide
+    </div>
+  </div>
+</div>
+
+<div class="rail" id="right"><div id="meta"></div></div>
+
+<div id="why">
+  <div class="hd">THE LATTICE — THREE RELATIONSHIPS, AT THE COST OF SEEING ANY OF THEM</div>
+  <div class="bd">A flat grid holds 256 items in full view but can only carry <b>two</b> relationships. A lattice carries <b>three</b> — and immediately hides most of itself behind itself. Slicing is how you pay for the third axis.<br>
+  There is exactly <b>one slot per address</b>, so items that want the same cell cannot all have it. They are pushed to the nearest free slot and the displacement is drawn. <b>The grid does not describe the collection; it deforms it to fit.</b></div>
+</div>
+
+<div id="stat"></div>
+
+<script src="../assets/data.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   8 x 8 x 4 = 256 slots for 256 items — a perfect fit in total, and
+   a terrible fit in detail. Subject groups run from 111 items to 6,
+   so most items cannot occupy the cell their data asks for.
+------------------------------------------------------------------ */
+
+const [NX,NY,NZ]=META.lattice;           /* 8, 8, 4 */
+const CELL=64, GAPZ=CELL*1.15;
+const RANKS=DATA.map(d=>d.rank), RMIN=Math.min(...RANKS), RMAX=Math.max(...RANKS);
+
+const trueCell=d=>{
+  const t=(d.rank-RMIN)/(RMAX-RMIN);
+  return [ Math.min(NX-1,Math.floor(t*NX)),
+           META.groups.indexOf(d.group),
+           META.aspects.indexOf(d.aspect) ];
+};
+
+/* greedy: take the true cell, else spiral to the nearest free one */
+const taken=new Map(), slot=new Map(), push=new Map();
+const key=(x,y,z)=>`${x},${y},${z}`;
+[...DATA].sort((a,b)=>a.rank-b.rank).forEach(d=>{
+  const [tx,ty,tz]=trueCell(d);
+  let best=null,bd=1e9;
+  for(let r=0;r<=Math.max(NX,NY,NZ);r++){
+    for(let dx=-r;dx<=r;dx++)for(let dy=-r;dy<=r;dy++)for(let dz=-r;dz<=r;dz++){
+      if(Math.max(Math.abs(dx),Math.abs(dy),Math.abs(dz))!==r) continue;
+      const x=tx+dx,y=ty+dy,z=tz+dz;
+      if(x<0||y<0||z<0||x>=NX||y>=NY||z>=NZ) continue;
+      if(taken.has(key(x,y,z))) continue;
+      const dist=Math.hypot(dx,dy,dz);
+      if(dist<bd){bd=dist;best=[x,y,z];}
+    }
+    if(best) break;
+  }
+  if(!best) best=[tx,ty,tz];
+  taken.set(key(...best),d.id); slot.set(d.id,best); push.set(d.id,bd);
+});
+
+const world=document.getElementById('world'), vec=document.getElementById('vec');
+let slice='none', si=0, exploded=false, wire=true, showVec=true, released=false;
+let yaw=-24, pitch=14, drag=false, lx=0, ly=0;
+
+/* wireframe cage */
+const cage=document.createElement('div');
+cage.style.cssText='position:absolute;transform-style:preserve-3d';
+world.appendChild(cage);
+function buildCage(){
+  let h='';
+  for(let z=0;z<NZ;z++){
+    const zz=z*(CELL+(exploded?GAPZ:0)) - ((NZ-1)*(CELL+(exploded?GAPZ:0)))/2;
+    h+=`<div class="cellw" data-z="${z}" style="
+      left:${-NX*CELL/2}px;top:${-NY*CELL/2}px;width:${NX*CELL}px;height:${NY*CELL}px;
+      transform:translateZ(${zz}px)"></div>`;
+  }
+  cage.innerHTML=h;
+  cage.style.opacity=wire?1:0;
+}
+
+const nodes=DATA.map(d=>{
+  const el=document.createElement('div');
+  el.className='it';
+  el.innerHTML=`<img src="${THUMB(d.thumb)}" loading="lazy" alt=""><div class="d"></div>`;
+  el.onmouseenter=()=>{el.classList.add('hot');info(d)};
+  el.onmouseleave=()=>el.classList.remove('hot');
+  el.onclick=()=>window.open(d.live,'_blank');
+  world.appendChild(el);
+  return {d,el};
+});
+
+const maxPush=Math.max(...[...push.values()]);
+
+function place(){
+  const zs=CELL+(exploded?GAPZ:0);
+  nodes.forEach(({d,el})=>{
+    const [sx,sy,sz]=slot.get(d.id);
+    const [tx,ty,tz]=trueCell(d);
+    const [x,y,z]= released ? [tx,ty,tz] : [sx,sy,sz];
+    const px=(x-(NX-1)/2)*CELL, py=(y-(NY-1)/2)*CELL, pz=(z-(NZ-1)/2)*zs;
+    const w=CELL-7, h=CELL-7;
+    el.style.width=w+'px'; el.style.height=h+'px';
+    el.style.transform=`translate3d(${px-w/2}px,${py-h/2}px,${pz}px)`;
+    const p=push.get(d.id)/(maxPush||1);
+    el.querySelector('.d').style.width=(p*100)+'%';
+    el.querySelector('.d').style.opacity=released?0:0.9;
+
+    let vis=true;
+    if(slice==='x') vis = sx===si;
+    if(slice==='y') vis = sy===si;
+    if(slice==='z') vis = sz===si;
+    el.classList.toggle('dim',!vis);
+  });
+  buildCage();
+  stat();
+  clearTimeout(place._t);
+  vec.innerHTML='';
+  place._t=setTimeout(drawVec,980);
+}
+
+function drawVec(){
+  if(!showVec||released){ vec.innerHTML=''; return; }
+  const {w,h}=({w:innerWidth,h:innerHeight});
+  let s='';
+  nodes.forEach(({d,el})=>{
+    if(push.get(d.id)<2.4) return;
+    if(el.classList.contains('dim')) return;
+    const r=el.getBoundingClientRect();
+    const [tx,ty,tz]=trueCell(d);
+    const zs=CELL+(exploded?GAPZ:0);
+    /* approximate the true cell's screen position from a sibling in that cell */
+    const tgt=nodes.find(n=>{const c=slot.get(n.d.id);return c[0]===tx&&c[1]===ty&&c[2]===tz});
+    if(!tgt) return;
+    const t=tgt.el.getBoundingClientRect();
+    s+=`<line x1="${r.left+r.width/2}" y1="${r.top+r.height/2}"
+              x2="${t.left+t.width/2}" y2="${t.top+t.height/2}"/>`;
+  });
+  vec.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+  vec.innerHTML=s;
+}
+
+function info(d){
+  const [sx,sy,sz]=slot.get(d.id), [tx,ty,tz]=trueCell(d), p=push.get(d.id);
+  document.getElementById('meta').innerHTML=
+    `<span class="t">${d.title}</span>
+     <div class="row"><i>slot</i><b>${sx},${sy},${sz}</b></div>
+     <div class="row"><i>wanted</i><b>${tx},${ty},${tz}</b></div>
+     <div class="row"><i>pushed</i><b class="${p>0?'push':''}">${p.toFixed(2)} cells</b></div>
+     <div class="row"><i>rank</i><b>${d.rank}</b></div>
+     <div class="row"><i>subject</i><b>${d.group} · ${d.category}</b></div>
+     <div class="row"><i>format</i><b>${d.aspect} (${d.ar})</b></div>`;
+}
+
+function stat(){
+  const vals=[...push.values()];
+  const moved=vals.filter(v=>v>0.01).length;
+  const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+  document.getElementById('stat').innerHTML=
+    `<b>${NX}×${NY}×${NZ}</b> = ${NX*NY*NZ} slots · ${DATA.length} items<br>
+     <span class="bad">${moved}</span> of ${DATA.length} could not have the cell they asked for<br>
+     mean displacement <b>${mean.toFixed(2)}</b> cells · worst <b>${maxPush.toFixed(2)}</b><br>
+     subject groups run <b>${Math.max(...Object.values(META.groupCounts))}</b> to <b>${Math.min(...Object.values(META.groupCounts))}</b> — the lattice wants 4 each`;
+}
+
+document.querySelectorAll('[data-sl]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-sl]').forEach(o=>o.classList.remove('on'));
+  b.classList.add('on'); slice=b.dataset.sl;
+  const sl=document.getElementById('slider');
+  const n = slice==='x'?NX : slice==='y'?NY : slice==='z'?NZ : 0;
+  sl.disabled = slice==='none'; sl.max=Math.max(0,n-1); sl.value=0; si=0;
+  document.getElementById('slLabel').textContent =
+    slice==='none' ? 'showing all 4 layers'
+    : slice==='x' ? `rank octile ${si+1} of ${NX}`
+    : slice==='y' ? `subject ${META.groups[si]}`
+    : `format ${META.aspects[si]}`;
+  place();
+});
+document.getElementById('slider').oninput=e=>{
+  si=+e.target.value;
+  document.getElementById('slLabel').textContent =
+    slice==='x' ? `rank octile ${si+1} of ${NX}`
+    : slice==='y' ? `subject ${META.groups[si]} (${META.groupCounts[META.groups[si]]||0} items)`
+    : `format ${META.aspects[si]} (${META.aspectCounts[META.aspects[si]]||0} items)`;
+  place();
+};
+const tog=(id,fn)=>{const e=document.getElementById(id);
+  e.onclick=()=>{e.classList.toggle('on');fn(e.classList.contains('on'))}};
+tog('bExp',v=>{exploded=v;place()});
+tog('bWire',v=>{wire=v;buildCage()});
+tog('bVec',v=>{showVec=v;vec.classList.toggle('on',v);drawVec()});
+tog('bTrue',v=>{released=v;place();});
+vec.classList.add('on');
+
+let zoom=1;
+function wt(){world.style.transform=`scale(${zoom}) rotateX(${pitch}deg) rotateY(${yaw}deg)`}
+addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY});
+addEventListener('mouseup',()=>{drag=false;setTimeout(drawVec,60)});
+addEventListener('mousemove',e=>{
+  if(!drag)return;
+  yaw+=(e.clientX-lx)*0.24; pitch=Math.max(-70,Math.min(70,pitch-(e.clientY-ly)*0.16));
+  lx=e.clientX;ly=e.clientY;
+  world.style.transition='none'; wt(); vec.innerHTML='';
+});
+addEventListener('mouseup',()=>world.style.transition='');
+addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.4,Math.min(2.4,zoom*(e.deltaY>0?.93:1.075)));wt();vec.innerHTML='';clearTimeout(place._t);place._t=setTimeout(drawVec,220);},{passive:false});
+addEventListener('resize',()=>{fit();place()});
+function fit(){
+  const availW=innerWidth-540, availH=innerHeight-210;
+  const span=Math.max(NX,NY)*CELL;
+  zoom=Math.max(.45,Math.min(1.6,(Math.min(availW,availH)/span)*1.12));
+  wt();
+}
+
+fit(); place();
+</script>
+</body>
+</html>

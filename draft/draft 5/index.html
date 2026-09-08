@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>256 — The Audit</title>
+<style>
+  :root{
+    --bg:#0b0a08; --fg:#f2efe8; --dim:#6b6659; --line:#232019;
+    --amb:#ffb020; --agree:#3fd68a; --dis:#ff4d2e;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--mono);
+       font-size:11px;letter-spacing:.05em;overflow:hidden}
+
+  #plot{position:fixed;top:0;left:250px;right:272px;bottom:0}
+  #svg{position:absolute;inset:0;pointer-events:none}
+  #svg line,#svg path{fill:none;vector-effect:non-scaling-stroke}
+  #svg .ax{stroke:rgba(255,255,255,.18);stroke-width:1}
+  #svg .id{stroke:var(--amb);stroke-width:1;stroke-dasharray:4 4;opacity:.7}
+  #svg .res{stroke:var(--dis);stroke-width:1;opacity:.30}
+  #svg text{fill:rgba(255,255,255,.42);font:8px var(--mono);letter-spacing:.14em}
+
+  .it{position:absolute;cursor:pointer;
+    transition:transform .95s cubic-bezier(.22,.9,.24,1),width .6s,height .6s,opacity .4s}
+  .it img{display:block;width:100%;height:100%;object-fit:cover;background:#1c1a16;
+    border:1px solid rgba(255,255,255,.14)}
+  .it.hot{z-index:9999}
+  .it.hot img{border-color:var(--amb);box-shadow:0 0 0 1px var(--amb),0 0 30px rgba(255,176,32,.5)}
+  .it .r{position:absolute;left:0;right:0;bottom:-3px;height:2px}
+
+  .rail{position:fixed;z-index:9000}
+  #left{left:16px;top:16px;width:222px}
+  .brand{font-size:10px;letter-spacing:.19em;line-height:1.55}
+  .brand i{font-style:normal;color:var(--dim);display:block;font-size:8px;margin-top:3px;line-height:1.65}
+  .grp{margin-top:16px}
+  .grp h4{font-size:8px;letter-spacing:.18em;color:var(--dim);margin:0 0 7px;font-weight:400}
+  .btn{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#100e0b;
+    color:var(--dim);padding:6px 9px;cursor:pointer;font:inherit;font-size:9px;
+    letter-spacing:.12em;margin-bottom:2px}
+  .btn:hover{color:var(--fg);border-color:var(--fg)}
+  .btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  .btn em{font-style:normal;display:block;font-size:8px;opacity:.62;margin-top:2px}
+
+  #rho{margin-top:16px;border-top:2px solid var(--amb);padding-top:12px}
+  #rho .lead{font-size:8px;letter-spacing:.15em;color:var(--amb)}
+  #rho .v{font-size:29px;letter-spacing:.03em;display:block;margin:4px 0 3px;color:var(--dis)}
+  #rho p{margin:8px 0 0;font-size:9px;line-height:1.85;color:var(--dim)}
+  #rho p b{color:var(--fg);font-weight:400}
+
+  #right{right:16px;top:16px;width:240px;text-align:right}
+  #meta{color:var(--dim);font-size:9px;line-height:1.75;min-height:150px}
+  #meta .t{color:var(--fg);font-size:10px;letter-spacing:.08em;display:block;margin-bottom:8px;line-height:1.5}
+  #meta .row{display:flex;justify-content:flex-end;gap:9px}
+  #meta .row i{font-style:normal;opacity:.45;min-width:78px}
+  #meta b{color:var(--fg);font-weight:400}
+  #meta .ag{color:var(--agree)}#meta .ds{color:var(--dis)}
+
+  #why{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9000;
+    width:min(820px,70vw);text-align:center;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(11,10,8,.985) 0%,rgba(11,10,8,.95) 55%,rgba(11,10,8,0) 100%);
+    padding:16px 30px 10px}
+  #why .hd{font-size:10px;letter-spacing:.23em;margin-bottom:8px}
+  #why .bd{font-size:10px;line-height:1.9;color:#b8b2a4}
+  #why .bd b{color:var(--fg);font-weight:400}
+</style>
+</head>
+<body>
+
+<div id="plot"><svg id="svg"></svg></div>
+
+<div class="rail" id="left">
+  <div class="brand">256 / DRAFT 05 — THE AUDIT<i>nothing on this page was tagged by a person. every axis is measured from the pixels.</i></div>
+
+  <div class="grp"><h4>VIEW</h4>
+    <button class="btn on" data-v="agree">AGREEMENT PLOT<em>hand rank vs measured order</em></button>
+    <button class="btn" data-v="shuffle">SHUFFLE<em>16×16 — re-sort and watch it scatter</em></button>
+    <button class="btn" data-v="residual">RESIDUALS<em>worst disagreements first</em></button>
+    <button class="btn" data-v="field">STRUCTURE FIELD<em>repetition × visual activity</em></button>
+  </div>
+
+  <div class="grp" id="shufBox" style="display:none"><h4>ORDER BY</h4>
+    <button class="btn on" data-o="hand">HAND — order → chaos</button>
+    <button class="btn" data-o="mach">MACHINE — measured repetition</button>
+  </div>
+
+  <div id="rho"></div>
+</div>
+
+<div class="rail" id="right"><div id="meta"></div></div>
+
+<div id="why"><div class="hd"></div><div class="bd"></div></div>
+
+<script src="../assets/data.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   Every other draft trusts a tag. This one trusts only the file.
+   reg  = autocorrelation strength of row/column means — how strongly
+          the image actually repeats
+   edge = mean absolute gradient — how much visual activity there is
+   Neither was assigned by a person, so the two orderings can be
+   compared, and the places they disagree are the tagging to revisit.
+------------------------------------------------------------------ */
+
+const SIDE=META.side;
+let view='agree', order='hand';
+const P={l:78,r:34,t:34,b:56};
+
+/* percentile ranks 0..1 for both orderings */
+const byHand=[...DATA].sort((a,b)=>a.rank-b.rank);
+const byMach=[...DATA].sort((a,b)=>a.regN-b.regN);
+const hp=new Map(byHand.map((d,i)=>[d.id,i/(DATA.length-1)]));
+const mp=new Map(byMach.map((d,i)=>[d.id,i/(DATA.length-1)]));
+DATA.forEach(d=>{ d._h=hp.get(d.id); d._m=mp.get(d.id); d._res=d._m-d._h; });
+
+const RHO=META.rhoRegRank;
+const plot=document.getElementById('plot'), svg=document.getElementById('svg');
+const W=()=>plot.clientWidth, H=()=>plot.clientHeight;
+
+function swarm(list,xOf,tw,th,maxY){
+  const placed=[]; const out=new Map();
+  list.forEach(d=>{
+    const x=xOf(d); let y=0;
+    for(let k=0;k<900;k++){
+      const c=(k%2?1:-1)*Math.ceil(k/2)*(th*0.55);
+      if(Math.abs(c)>maxY) continue;
+      if(!placed.some(p=>Math.abs(p.x-x)<tw*0.92 && Math.abs(p.y-c)<th*0.92)){y=c;break;}
+    }
+    placed.push({x,y}); out.set(d.id,{x,y});
+  });
+  return out;
+}
+let SW=null;
+
+const nodes=DATA.map(d=>{
+  const el=document.createElement('div');
+  el.className='it';
+  el.innerHTML=`<img src="${THUMB(d.thumb)}" loading="lazy" alt=""><div class="r"></div>`;
+  el.onmouseenter=()=>{el.classList.add('hot');info(d)};
+  el.onmouseleave=()=>el.classList.remove('hot');
+  el.onclick=()=>window.open(d.live,'_blank');
+  plot.appendChild(el);
+  return {d,el};
+});
+
+const NOTE={
+ agree:['THE AGREEMENT PLOT — WHERE THE ARCHIVE’S OWN CLAIM BREAKS DOWN',
+  `Y is your hand-assigned order→chaos rank. X is repetition measured straight from the pixels. If the ranking were tracking visual order, this would be a <b>diagonal</b>. It is a cloud: Spearman <b>ρ = ${RHO}</b>. That is not a mistake — it means your spectrum is a <b>semantic</b> judgement about what the grid is doing, not a formal one about how regular the picture looks. Worth saying out loud in the thesis rather than leaving implied.`],
+ shuffle:['SHUFFLE — THE DISTANCE BETWEEN TWO ORDERINGS',
+  `The same 16×16 grid, filled first by your ranking and then by the machine’s. <b>If the two agreed, nothing would move.</b> The amount of scatter you see when you switch is the disagreement, made physical instead of numerical.`],
+ residual:['RESIDUALS — THE TAGGING SHORTLIST',
+  `Sorted by how far each item sits from the diagonal. At the top are pictures you called <b>ordered</b> that measure chaotic; at the bottom, ones you called <b>chaotic</b> that measure highly repetitive. These are the rows to re-look at first — not because the machine is right, but because it is consistent.`],
+ field:['STRUCTURE FIELD — TWO MEASURES, NO TAGS',
+  `X is repetition, Y is visual activity. Nothing here was decided by a person, which makes it the only layout in the set with <b>no editorial content at all</b>. Dense top-right is busy and repetitive; bottom-left is quiet and irregular. Use it to find near-duplicates you have collected twice.`],
+};
+
+function layout(){
+  const w=W(), h=H(), iw=w-P.l-P.r, ih=h-P.t-P.b;
+  let s='';
+
+  if(view==='agree'||view==='field'){
+    s+=`<line class="ax" x1="${P.l}" y1="${h-P.b}" x2="${w-P.r}" y2="${h-P.b}"/>`;
+    s+=`<line class="ax" x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${h-P.b}"/>`;
+  }
+  if(view==='agree'){
+    s+=`<line class="id" x1="${P.l}" y1="${h-P.b}" x2="${w-P.r}" y2="${P.t}"/>`;
+    s+=`<text x="${w-P.r-172}" y="${P.t+14}">PERFECT AGREEMENT</text>`;
+    s+=`<text x="${P.l}" y="${h-P.b+22}">← MEASURED: LESS REPETITIVE   ·   MORE REPETITIVE →</text>`;
+    s+=`<text transform="translate(${P.l-12},${h-P.b}) rotate(-90)">← HAND: ORDER   ·   CHAOS →</text>`;
+  }
+  if(view==='field'){
+    s+=`<text x="${P.l}" y="${h-P.b+22}">← MEASURED REPETITION →</text>`;
+    s+=`<text transform="translate(${P.l-12},${h-P.b}) rotate(-90)">← VISUAL ACTIVITY →</text>`;
+  }
+  if(view==='residual'){
+    const mid=P.l+iw/2;
+    s+=`<line class="ax" x1="${mid}" y1="${P.t}" x2="${mid}" y2="${h-P.b}"/>`;
+    s+=`<text x="${mid+10}" y="${P.t+14}">MACHINE SAYS MORE CHAOTIC THAN YOU DID →</text>`;
+    s+=`<text x="${P.l+6}" y="${P.t+14}">← MACHINE SAYS MORE ORDERED THAN YOU DID</text>`;
+    [-0.5,-0.25,0.25,0.5].forEach(v=>{
+      const px=P.l+iw/2+v*iw*0.46;
+      s+=`<line class="ax" x1="${px}" y1="${P.t+22}" x2="${px}" y2="${h-P.b}" opacity=".35"/>`;
+      s+=`<text x="${px-10}" y="${h-P.b+18}">${v>0?'+':''}${v*100}</text>`;
+    });
+    s+=`<text x="${mid-14}" y="${h-P.b+18}">0</text>`;
+  }
+
+  const resSorted=[...DATA].sort((a,b)=>b._res-a._res);
+  if(view==='residual'){
+    const tw=26, th=18;
+    SW=swarm([...DATA].sort((a,b)=>Math.abs(a._res)-Math.abs(b._res)),
+             d=>P.l+iw/2+d._res*iw*0.46, tw, th, ih*0.44);
+  }
+
+  nodes.forEach(({d,el})=>{
+    let x=0,y=0,bw=30,bh=21;
+
+    if(view==='agree'){
+      x=P.l+d._m*iw; y=(h-P.b)-d._h*ih; bw=38; bh=26;
+    }
+    if(view==='field'){
+      x=P.l+d.regN*iw; y=(h-P.b)-d.edgeN*ih; bw=38; bh=26;
+    }
+    if(view==='shuffle'){
+      const list = order==='hand'?byHand:byMach;
+      const i=list.findIndex(o=>o.id===d.id);
+      const cs=Math.min(iw/SIDE,ih/SIDE);
+      x=P.l+(iw-cs*SIDE)/2+(i%SIDE)*cs;
+      y=P.t+(ih-cs*SIDE)/2+Math.floor(i/SIDE)*cs;
+      bw=cs-2; bh=cs-2;
+    }
+    if(view==='residual'){
+      const q=SW.get(d.id);
+      x=q.x; y=P.t+ih/2+q.y; bw=26; bh=18;
+    }
+
+    el.style.width=bw+'px'; el.style.height=bh+'px';
+    el.style.transform=`translate(${x-bw/2}px,${y-bh/2}px)`;
+    const a=Math.abs(d._res);
+    el.querySelector('.r').style.background = a<0.12?'var(--agree)':a<0.32?'var(--amb)':'var(--dis)';
+    el.querySelector('.r').style.opacity = view==='shuffle'?0.95:0.8;
+  });
+
+  if(view==='agree'){
+    DATA.forEach(d=>{
+      if(Math.abs(d._res)<0.45) return;
+      const x=P.l+d._m*iw, y=(h-P.b)-d._h*ih;
+      const px=P.l+d._h*iw, py=(h-P.b)-d._h*ih;
+      s+=`<line class="res" x1="${x}" y1="${y}" x2="${px}" y2="${py}"/>`;
+    });
+  }
+
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  svg.innerHTML=s;
+
+  const n=NOTE[view];
+  const why=document.getElementById('why');
+  why.style.opacity=0;
+  setTimeout(()=>{why.querySelector('.hd').textContent=n[0];
+    why.querySelector('.bd').innerHTML=n[1]; why.style.opacity=1;},180);
+}
+
+function info(d){
+  const a=Math.abs(d._res);
+  const verdict=a<0.12?['ag','agrees']:a<0.32?['','drifts']:['ds','disagrees'];
+  document.getElementById('meta').innerHTML=
+    `<span class="t">${d.title}</span>
+     <div class="row"><i>hand rank</i><b>${d.rank} · ${Math.round(d._h*100)}%</b></div>
+     <div class="row"><i>measured</i><b>${Math.round(d._m*100)}%</b></div>
+     <div class="row"><i>verdict</i><b class="${verdict[0]}">${verdict[1]} (${d._res>0?'+':''}${(d._res*100).toFixed(0)})</b></div>
+     <div class="row"><i>repetition</i><b>${d.reg.toFixed(3)}</b></div>
+     <div class="row"><i>activity</i><b>${d.edge.toFixed(3)}</b></div>
+     <div class="row"><i>grid pitch</i><b>${(d.pitch*100).toFixed(0)}% · ${d.ax}-axis</b></div>
+     <div class="row"><i>format</i><b>${d.aspect} (${d.ar})</b></div>
+     <div class="row"><i>band</i><b>${META.bandLabels[d.spectrum]}</b></div>`;
+}
+
+const sev=DATA.filter(d=>Math.abs(d._res)>0.32).length;
+const agr=DATA.filter(d=>Math.abs(d._res)<0.12).length;
+document.getElementById('rho').innerHTML=
+  `<span class="lead">SPEARMAN ρ — HAND vs MEASURED</span>
+   <span class="v">${RHO>0?'+':''}${RHO.toFixed(3)}</span>
+   <p><b>${agr}</b> of ${DATA.length} items agree within 12 points.<br>
+      <b style="color:var(--dis)">${sev}</b> disagree by more than 32.<br>
+      Edge density vs rank: <b>${META.rhoEdgeRank}</b>.</p>
+   <p style="opacity:.75">ρ near ±1 would mean your ranking tracks measurable
+      repetition. At <b>${RHO.toFixed(2)}</b> it does not — the spectrum is
+      measuring something the pixels cannot see.</p>`;
+
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-v]').forEach(o=>o.classList.remove('on'));
+  b.classList.add('on'); view=b.dataset.v;
+  document.getElementById('shufBox').style.display = view==='shuffle'?'block':'none';
+  layout();
+});
+document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-o]').forEach(o=>o.classList.remove('on'));
+  b.classList.add('on'); order=b.dataset.o; layout();
+});
+addEventListener('resize',layout);
+layout();
+</script>
+</body>
+</html>

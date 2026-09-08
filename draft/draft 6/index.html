@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>256 — A Field of Grids</title>
+<style>
+  :root{
+    --paper:#e9e7e1;
+    --ink:#131210;
+    --soft:#8b8779;
+    --rule:#cfcabb;
+    --mark:#1b2ad0;
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+       font-size:12px;overflow:hidden;-webkit-font-smoothing:antialiased}
+
+  /* ---------- left column ---------- */
+  aside{position:fixed;left:0;top:0;bottom:0;width:268px;padding:30px 26px 26px;
+        display:flex;flex-direction:column;z-index:10}
+  .word{font-size:44px;line-height:.86;letter-spacing:-.035em;font-weight:600;margin:0}
+  .sub{margin:12px 0 0;font-size:12px;line-height:1.5;color:var(--soft);max-width:200px}
+  .sub b{color:var(--ink);font-weight:500}
+
+  .cap{margin-top:26px;min-height:150px;padding-top:20px;border-top:1px solid var(--rule)}
+  .cap .t{font-size:14px;line-height:1.32;letter-spacing:-.012em;margin:0 0 10px;
+          font-weight:500;max-width:214px}
+  .cap .m{font-size:11px;color:var(--soft);line-height:1.75}
+  .cap .m span{color:var(--ink)}
+  .cap .idle{color:var(--soft);font-size:12px;line-height:1.5}
+
+  .ctl{margin-top:auto;padding-top:18px;border-top:1px solid var(--rule)}
+  .ctl .lab{display:flex;justify-content:space-between;font-size:10px;
+            letter-spacing:.09em;text-transform:uppercase;color:var(--soft);margin-bottom:11px}
+  .ctl .lab b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;
+    background:transparent;cursor:ew-resize;display:block}
+  input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--ink)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:14px;
+    background:var(--mark);margin-top:-6.5px;border:0;border-radius:0}
+  input[type=range]::-moz-range-track{height:1px;background:var(--ink)}
+  input[type=range]::-moz-range-thumb{width:9px;height:14px;background:var(--mark);
+    border:0;border-radius:0}
+  .hint{font-size:10px;color:var(--soft);margin-top:9px;line-height:1.55}
+
+  /* ---------- field ---------- */
+  main{position:fixed;left:268px;right:0;top:0;bottom:0;
+       display:flex;align-items:center;justify-content:center}
+  #field{display:grid;transition:gap .28s ease}
+  .cell{position:relative;overflow:hidden;cursor:pointer;background:#dbd7cc}
+  .cell img{display:block;width:100%;height:100%;object-fit:cover;
+            transition:opacity .25s, filter .25s}
+  .cell::after{content:"";position:absolute;inset:0;border:1px solid var(--mark);
+    opacity:0;transition:opacity .16s;pointer-events:none}
+  .cell:hover::after{opacity:1}
+  body.hovering .cell img{opacity:.34;filter:saturate(.35)}
+  body.hovering .cell:hover img{opacity:1;filter:none}
+
+  /* faint index in the outer margin */
+  .wrap{position:relative}
+  .edge{position:absolute;color:var(--soft);font-size:10px;letter-spacing:.1em;
+        text-transform:uppercase;pointer-events:none;white-space:nowrap}
+  #eL{top:-19px;left:0}
+  #eR{bottom:-19px;right:0}
+</style>
+</head>
+<body>
+
+<aside>
+  <h1 class="word">256</h1>
+  <p class="sub">A working archive of grids.<br><b id="count"></b> of them, arranged.</p>
+
+  <div class="cap" id="cap">
+    <div class="idle">Point at anything.</div>
+  </div>
+
+  <div class="ctl">
+    <div class="lab"><span>Gutter</span><b id="gv">6px</b></div>
+    <input type="range" id="g" min="0" max="16" value="6" step="1">
+    <div class="hint" id="hint">Close it all the way.</div>
+  </div>
+</aside>
+
+<main><div class="wrap">
+  <div class="edge" id="eL"></div>
+  <div id="field"></div>
+  <div class="edge" id="eR"></div>
+</div></main>
+
+<script src="../assets/data6.js"></script>
+<script>
+const SIDE = META.side;                       /* 12 */
+const field = document.getElementById('field');
+const cap   = document.getElementById('cap');
+
+document.getElementById('count').textContent = META.total;
+document.getElementById('eL').textContent = 'fewest divisions';
+document.getElementById('eR').textContent = 'most divisions';
+
+DATA.forEach(d => {
+  const c = document.createElement('div');
+  c.className = 'cell';
+  c.innerHTML = `<img src="${THUMB(d.thumb)}" loading="lazy" alt="">`;
+  c.onmouseenter = () => { document.body.classList.add('hovering'); show(d); };
+  c.onmouseleave = () => { document.body.classList.remove('hovering'); idle(); };
+  if (d.live) c.onclick = () => window.open(d.live, '_blank');
+  field.appendChild(c);
+});
+
+function show(d){
+  cap.innerHTML =
+    `<p class="t">${d.title}</p>
+     <div class="m">
+       ${d.cat}<br>
+       <span>${d.v} × ${d.h}</span> — ${d.cells} cells<br>
+       ${d.n + 1} of ${META.total}
+     </div>`;
+}
+function idle(){ cap.innerHTML = '<div class="idle">Point at anything.</div>'; }
+
+function size(){
+  const m = document.querySelector('main');
+  const gap = +document.getElementById('g').value;
+  const avail = Math.min(m.clientWidth - 84, m.clientHeight - 84);
+  const cell = Math.floor((avail - gap * (SIDE - 1)) / SIDE);
+  field.style.gridTemplateColumns = `repeat(${SIDE}, ${cell}px)`;
+  field.style.gridAutoRows = cell + 'px';
+  field.style.gap = gap + 'px';
+}
+
+document.getElementById('g').addEventListener('input', e => {
+  const v = +e.target.value;
+  document.getElementById('gv').textContent = v + 'px';
+  document.getElementById('hint').textContent =
+    v === 0 ? 'One surface.' : 'Close it all the way.';
+  size();
+});
+addEventListener('resize', size);
+size();
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>256 — Common Measure</title>
+<style>
+  :root{
+    --paper:#e9e7e1; --ink:#131210; --soft:#8b8779; --rule:#cfcabb;
+    --mark:#1b2ad0; --line:rgba(19,18,16,.42);
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+       font-size:12px;overflow:hidden;-webkit-font-smoothing:antialiased;
+       cursor:grab}
+  body.drag{cursor:grabbing}
+
+  #stage{position:fixed;inset:0;overflow:hidden}
+  #scene{position:absolute;left:50%;top:50%;transform-origin:0 0;will-change:transform}
+  #net{position:absolute;overflow:visible;pointer-events:none}
+  #net line{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke;
+            transition:stroke .18s, stroke-width .18s}
+  #net line.lit{stroke:var(--mark);stroke-width:1.6}
+  body.focus #net line{stroke:rgba(19,18,16,.09)}
+  body.focus #net line.lit{stroke:var(--mark)}
+
+  .node{position:absolute;cursor:pointer;transition:opacity .22s, transform .22s}
+  .node img{display:block;width:100%;height:100%;object-fit:cover;
+            background:#dbd7cc;box-shadow:0 1px 0 rgba(0,0,0,.10)}
+  .node::after{content:"";position:absolute;inset:-3px;border:1px solid var(--mark);
+    opacity:0;transition:opacity .16s}
+  body.focus .node{opacity:.16}
+  body.focus .node.kin{opacity:1}
+  body.focus .node.self{opacity:1;transform:scale(1.5);z-index:50}
+  .node.self::after{opacity:1}
+
+  /* ---------- chrome ---------- */
+  aside{position:fixed;left:0;top:0;bottom:0;width:288px;padding:30px 26px 26px;
+        display:flex;flex-direction:column;z-index:20;pointer-events:none}
+  aside::before{content:"";position:absolute;inset:0;z-index:-1;
+    background:linear-gradient(90deg,var(--paper) 0%,var(--paper) 62%,rgba(233,231,225,.92) 82%,rgba(233,231,225,0) 100%)}
+  aside > *{pointer-events:auto}
+  .word{font-size:44px;line-height:.86;letter-spacing:-.035em;font-weight:600;margin:0}
+  .sub{margin:12px 0 0;font-size:12px;line-height:1.5;color:var(--soft);max-width:196px}
+  .sub b{color:var(--ink);font-weight:500}
+
+  .cap{margin-top:26px;min-height:150px;padding-top:20px;border-top:1px solid var(--rule)}
+  .cap .t{font-size:14px;line-height:1.32;letter-spacing:-.012em;margin:0 0 10px;
+          font-weight:500;max-width:208px}
+  .cap .m{font-size:11px;color:var(--soft);line-height:1.75}
+  .cap .m span{color:var(--ink)}
+  .cap .kin{color:var(--mark);margin-top:9px;display:block;line-height:1.6}
+  .cap .idle{color:var(--soft);font-size:12px;line-height:1.5}
+
+  .ctl{margin-top:auto;padding-top:18px;border-top:1px solid var(--rule)}
+  .ctl .lab{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.09em;
+            text-transform:uppercase;color:var(--soft);margin-bottom:11px}
+  .ctl .lab b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;
+    background:transparent;cursor:ew-resize;display:block}
+  input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--ink)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:14px;
+    background:var(--mark);margin-top:-6.5px;border:0;border-radius:0}
+  input[type=range]::-moz-range-track{height:1px;background:var(--ink)}
+  input[type=range]::-moz-range-thumb{width:9px;height:14px;background:var(--mark);border:0;border-radius:0}
+  .hint{font-size:10px;color:var(--soft);margin-top:9px;line-height:1.55}
+
+  .corner{position:fixed;bottom:18px;right:22px;font-size:10px;color:var(--soft);
+          letter-spacing:.06em;z-index:20;text-align:right;line-height:1.7;
+          background:rgba(233,231,225,.90);padding:8px 10px}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="scene">
+    <svg id="net"></svg>
+  </div>
+</div>
+
+<aside>
+  <h1 class="word">256</h1>
+  <p class="sub">A working archive of grids.<br><b id="count"></b> of them, held together.</p>
+
+  <div class="cap" id="cap"><div class="idle">Point at anything.</div></div>
+
+  <div class="ctl">
+    <div class="lab"><span>Ties</span><b id="kv">3</b></div>
+    <input type="range" id="k" min="1" max="6" value="3" step="1">
+    <div class="hint" id="hint">Drag to move. Scroll to zoom.</div>
+  </div>
+</aside>
+
+<div class="corner" id="corner"></div>
+
+<script src="../assets/data7.js?b=2"></script>
+<script>
+const TILE = META.tile || 96;   /* positions are already in px */
+const scene = document.getElementById('scene');
+const net   = document.getElementById('net');
+const cap   = document.getElementById('cap');
+let k = 3, tx = 0, ty = 0, z = 1, drag = false, lx = 0, ly = 0, moved = false;
+
+document.getElementById('count').textContent = META.total;
+
+/* ---------- nodes ---------- */
+const nodes = DATA.map((d, i) => {
+  const el = document.createElement('div');
+  el.className = 'node';
+  const w = TILE, h = TILE;
+  el.style.cssText = `left:${d.x - w / 2}px;top:${d.y - h / 2}px;width:${w}px;height:${h}px`;
+  el.innerHTML = `<img src="${THUMB(d.thumb)}" loading="lazy" alt="">`;
+  el.addEventListener('mouseenter', () => focusOn(i));
+  el.addEventListener('mouseleave', blur);
+  el.addEventListener('click', () => { if (!moved && d.live) window.open(d.live, '_blank'); });
+  scene.appendChild(el);
+  return el;
+});
+
+/* ---------- edges ---------- */
+let lines = [];
+function sizeNet(){
+  const xs = DATA.map(d => d.x), ys = DATA.map(d => d.y), pad = TILE;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  const w  = Math.max(...xs) - Math.min(...xs) + pad * 2;
+  const h  = Math.max(...ys) - Math.min(...ys) + pad * 2;
+  net.setAttribute('viewBox', `${x0} ${y0} ${w} ${h}`);
+  net.style.cssText = `position:absolute;left:${x0}px;top:${y0}px;width:${w}px;height:${h}px;pointer-events:none`;
+}
+function drawEdges(){
+  sizeNet();
+  const E = META.edges[String(k)];
+  net.innerHTML = E.map(([a, b]) =>
+    `<line data-a="${a}" data-b="${b}"
+      x1="${DATA[a].x}" y1="${DATA[a].y}"
+      x2="${DATA[b].x}" y2="${DATA[b].y}"/>`).join('');
+  lines = [...net.querySelectorAll('line')];
+  document.getElementById('corner').innerHTML =
+    `${E.length} ties · ${META.total} pictures<br>an edge means a shared measure`;
+}
+
+/* ---------- focus ---------- */
+function kinOf(i){
+  const s = new Set();
+  META.edges[String(k)].forEach(([a, b]) => {
+    if (a === i) s.add(b);
+    if (b === i) s.add(a);
+  });
+  return s;
+}
+function focusOn(i){
+  const d = DATA[i], kin = kinOf(i);
+  document.body.classList.add('focus');
+  nodes.forEach((el, j) => {
+    el.classList.toggle('kin', kin.has(j));
+    el.classList.toggle('self', j === i);
+  });
+  lines.forEach(l => l.classList.toggle('lit',
+    +l.dataset.a === i || +l.dataset.b === i));
+  const names = [...kin].slice(0, 3).map(j => DATA[j].cat);
+  cap.innerHTML =
+    `<p class="t">${d.title}</p>
+     <div class="m">${d.cat}<br><span>${d.v} × ${d.h}</span> — ${d.cells} cells</div>
+     <span class="kin">tied to ${kin.size} other${kin.size === 1 ? '' : 's'}${
+       names.length ? ' — ' + [...new Set(names)].join(', ') : ''}</span>`;
+}
+function blur(){
+  document.body.classList.remove('focus');
+  nodes.forEach(el => el.classList.remove('kin', 'self'));
+  lines.forEach(l => l.classList.remove('lit'));
+  cap.innerHTML = '<div class="idle">Point at anything.</div>';
+}
+
+/* ---------- view ---------- */
+function apply(){ scene.style.transform = `translate(${tx}px,${ty}px) scale(${z})`; }
+/* land inside the cloud at reading scale — you explore it, you don't survey it */
+function fit(){
+  z = 0.70; tx = 130; ty = 0; apply();
+}
+addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
+  document.body.classList.add('drag'); });
+addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly) > 3) moved = true;
+  tx += e.clientX - lx; ty += e.clientY - ly; lx = e.clientX; ly = e.clientY; apply();
+});
+addEventListener('wheel', e => {
+  e.preventDefault();
+  const f = e.deltaY > 0 ? 0.92 : 1.087;
+  const nz = Math.max(0.12, Math.min(2.6, z * f));
+  const mx = e.clientX - innerWidth / 2, my = e.clientY - innerHeight / 2;
+  tx = mx - (mx - tx) * (nz / z); ty = my - (my - ty) * (nz / z);
+  z = nz; apply();
+}, { passive: false });
+
+document.getElementById('k').addEventListener('input', e => {
+  k = +e.target.value;
+  document.getElementById('kv').textContent = k;
+  document.getElementById('hint').textContent =
+    k === 1 ? 'Only the closest match.' :
+    k === 6 ? 'Everything finds a relative.' : 'Drag to move. Scroll to zoom.';
+  drawEdges(); blur();
+});
+
+
+drawEdges(); fit();
+</script>
+</body>
+</html>

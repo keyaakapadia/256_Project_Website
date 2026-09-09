@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>256 — Field</title>
+<title>256 — Kin</title>
 <style>
   :root{
-    --bg:#0d0d0f; --fg:#f2f1ee; --soft:#7d7a75;
+    --bg:#0b0b0c; --fg:#f4f3f0; --soft:#77746f; --line:rgba(255,255,255,.14);
     --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
   }
   *{box-sizing:border-box}
@@ -17,47 +17,50 @@
 
   #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
   #world{position:fixed;inset:0}
-
   .node{position:absolute;will-change:transform;cursor:pointer}
-  .node img{display:block;width:100%;height:100%;object-fit:cover;background:#1a1a1d;
-    transition:none}
-  .node.on img{box-shadow:0 10px 44px rgba(0,0,0,.6)}
+  .node img{display:block;width:100%;height:100%;object-fit:cover;background:#191919}
   .node.on{z-index:9999!important}
+  .node.on img{box-shadow:0 12px 50px rgba(0,0,0,.65)}
 
-  /* ---------- chrome ---------- */
+  .end{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
+       letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+
   .panel{position:fixed;z-index:40}
-  .brand{left:26px;bottom:22px;font-size:11px;letter-spacing:.03em;color:var(--soft)}
-  .made{right:26px;bottom:22px;font-size:11px;color:var(--soft)}
+  .brand{left:20px;top:18px;font-size:12px;letter-spacing:.03em;color:var(--soft);
+         background:rgba(11,11,12,.86);padding:8px 12px;border-radius:8px}
+  .brand b{color:var(--fg);font-weight:500}
+  .made{right:20px;bottom:18px;font-size:11px;color:var(--soft);text-align:right;line-height:1.8;
+        background:rgba(11,11,12,.86);padding:9px 12px;border-radius:8px}
 
-  #viewby{left:26px;top:50%;transform:translateY(-50%);
-          background:rgba(20,20,23,.72);backdrop-filter:blur(9px);
-          padding:14px 16px 13px;border-radius:9px;width:196px}
-  #viewby h4{margin:0 0 10px;font-size:11px;color:var(--soft);font-weight:400}
-  .rw{display:flex;align-items:center;gap:9px;padding:4px 0;cursor:pointer;user-select:none;
-      color:var(--fg);font-size:12px}
-  .rw i{width:9px;height:9px;border-radius:50%;flex:none}
-  .rw b{font-weight:400;flex:1}
-  .rw.off{opacity:.34}
-  .rw:hover{opacity:1}
+  #kin{left:20px;bottom:18px;width:262px;background:rgba(11,11,12,.86);
+       backdrop-filter:blur(10px);padding:14px 16px 12px;border-radius:8px}
+  #kin h4{margin:0 0 11px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+          color:var(--soft);font-weight:400}
+  .kw{display:flex;align-items:flex-start;gap:10px;padding:7px 0;cursor:pointer;user-select:none;
+      border-top:1px solid var(--line)}
+  .kw i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px}
+  .kw .b{flex:1}
+  .kw .b em{font-style:normal;display:block;font-size:11px;font-weight:500;
+            display:flex;justify-content:space-between;gap:8px}
+  .kw .b em span{color:var(--soft);font-weight:400;font-variant-numeric:tabular-nums}
+  .kw .b small{display:block;color:var(--soft);font-size:10px;line-height:1.5;margin-top:3px}
+  .kw.off{opacity:.3}
+  .kw:hover{opacity:1}
 
-  #meta{right:26px;top:50%;transform:translateY(-50%);display:none;
-        background:rgba(20,20,23,.72);backdrop-filter:blur(9px);
-        padding:14px 16px;border-radius:9px;min-width:214px;max-width:264px}
-  #meta .r{display:flex;gap:16px;padding:2px 0;font-size:12px}
-  #meta .r span{color:var(--soft);width:64px;flex:none}
-  #meta .r b{font-weight:500;flex:1}
-  #meta .ties{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.12);
-              font-size:11px;color:var(--soft);line-height:1.7}
-  #meta .ties em{font-style:normal}
+  #meta{right:20px;top:18px;width:248px;display:none;background:rgba(11,11,12,.86);
+        backdrop-filter:blur(10px);padding:14px 16px;border-radius:8px}
+  #meta .t{font-size:13px;font-weight:500;line-height:1.35;margin-bottom:10px}
+  #meta .r{display:flex;gap:12px;font-size:11px;padding:3px 0;border-top:1px solid var(--line)}
+  #meta .r span{color:var(--soft);width:66px;flex:none}
+  #meta .r b{font-weight:400;flex:1;text-align:right}
+  #meta .kin{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);
+             font-size:11px;line-height:1.85;color:var(--soft)}
+  #meta .kin em{font-style:normal}
 
-  .hint{left:50%;top:22px;transform:translateX(-50%);font-size:11px;color:var(--soft)}
-
-  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;
-        align-items:center;justify-content:center;flex-direction:column;gap:9px;
-        transition:opacity .7s}
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
+        justify-content:center;flex-direction:column;gap:8px;transition:opacity .7s}
   #boot.gone{opacity:0;pointer-events:none}
-  #boot .n{font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
-  #boot .s{font-size:11px;color:var(--soft)}
+  #boot .s{font-size:11px;color:var(--soft);font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -65,21 +68,25 @@
 <div id="world"></div>
 <canvas id="wire"></canvas>
 
-<div class="panel hint">left to right: how many cells the picture is cut into · hover to see its ties</div>
-<div class="panel" id="viewby"><h4>View by</h4><div id="rlist"></div></div>
+<div class="panel brand"><b>256</b> — one hundred and forty-four grids</div>
+<div class="panel" id="kin"><h4>Kinship</h4><div id="klist"></div></div>
 <div class="panel" id="meta"></div>
-<div class="panel brand">256 Project, CD Thesis</div>
 <div class="panel made" id="made"></div>
 
-<div id="boot"><div class="n" id="bootn">Welcome…</div><div class="s" id="boots">0 of 144</div></div>
+<div id="boot"><div class="s" id="boots">0 / 144</div></div>
 
-<script src="../assets/data9.js?b=2"></script>
+<script src="../assets/data10.js?b=1"></script>
 <script>
 /* ------------------------------------------------------------------
-   Five relationships, five colours, all drawn at once. Any two
-   pictures can be joined by more than one line — a picture of a
-   crowd and a woven textile might share a measure and a texture but
-   nothing else. Hovering shows everything one picture is tied to.
+   Position: x is the division count. Few cells at the left, many at
+   the right. Nothing else is encoded in where a picture sits.
+
+   Ties: three kinships, and a picture only ever gets its CLOSEST
+   match in each — so a line means "nothing in the archive is nearer
+   to this than that", not "these are vaguely similar".
+
+   Colour: cyan, magenta, yellow. Halftone screening is itself a grid,
+   and overlaying the three plates is how any printed image is made.
 ------------------------------------------------------------------ */
 
 const world = document.getElementById('world');
@@ -87,46 +94,16 @@ const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
 const TILE = META.tile, B = META.bounds;
 
 let camX = (B[0] + B[2]) / 2, camY = (B[1] + B[3]) / 2;
-let dist = 2100, focal = 1400;
+let dist = 3400, focal = 1400;
 let drag = false, lx = 0, ly = 0, moved = false;
 let hot = -1, off = new Set();
 
-const LG = d => Math.log2(Math.max(1, d.cells));
+const ALL = [];
+META.relOrder.forEach(r => META.ties[r].forEach(([a, b]) => ALL.push([a, b, r])));
 
-/* ---------- who is tied to whom, and by what ---------- */
-const near = (key, k) => {
-  const out = [];
-  for (let i = 0; i < DATA.length; i++) {
-    const o = DATA.map((d, j) => j).filter(j => j !== i)
-      .sort((a, b) => Math.abs(key(DATA[a]) - key(DATA[i])) - Math.abs(key(DATA[b]) - key(DATA[i])));
-    out.push(o.slice(0, k));
-  }
-  return out;
-};
-const NEAR_M = near(LG, 12);
-const NEAR_T = near(d => d.grain, 12);
+const tiesOf = i => ALL.filter(([a, b, r]) => !off.has(r) && (a === i || b === i))
+                       .map(([a, b, r]) => [a === i ? b : a, r]);
 
-function tiesOf(i){
-  const d = DATA[i], out = [];
-  const add = (j, rel) => { if (j !== i) out.push([j, rel]); };
-  DATA.forEach((o, j) => { if (o.theme === d.theme) add(j, 'theme'); });
-  NEAR_M[i].forEach(j => add(j, 'measure'));
-  NEAR_T[i].forEach(j => add(j, 'texture'));
-  DATA.forEach((o, j) => { if (o.band === d.band && (i + j) % 3 === 0) add(j, 'spectrum'); });
-  DATA.forEach((o, j) => { if (o.world === d.world && (i + j) % 5 === 0) add(j, 'register'); });
-  return out.filter(([, rel]) => !off.has(rel));
-}
-
-/* a thin resting web so the field is never empty */
-const WEB = [];
-DATA.forEach((d, i) => {
-  NEAR_M[i].slice(0, 2).forEach(j => WEB.push([i, j, 'measure']));
-  NEAR_T[i].slice(0, 2).forEach(j => WEB.push([i, j, 'texture']));
-  const sameTheme = DATA.map((o, j) => j).filter(j => j !== i && DATA[j].theme === d.theme);
-  sameTheme.slice(0, 2).forEach(j => WEB.push([i, j, 'theme']));
-});
-
-/* ---------- pictures ---------- */
 const nodes = DATA.map((d, i) => {
   const el = document.createElement('div');
   el.className = 'node';
@@ -138,12 +115,9 @@ const nodes = DATA.map((d, i) => {
   return el;
 });
 
-/* the field runs along one measured axis; say so, out in the space itself */
-const ends = [['few divisions', B[0] - 260], ['many divisions', B[2] + 260]].map(([t, x]) => {
+const ends = [['few divisions', B[0] - 300], ['many divisions', B[2] + 300]].map(([t, x]) => {
   const el = document.createElement('div');
-  el.style.cssText = 'position:absolute;color:#7d7a75;font-size:12px;letter-spacing:.14em;'+
-    'text-transform:uppercase;white-space:nowrap;transform:translate(-50%,-50%);pointer-events:none';
-  el.textContent = t;
+  el.className = 'end'; el.textContent = t;
   world.appendChild(el);
   return { el, x };
 });
@@ -169,86 +143,76 @@ function paint(){
 
   const P = DATA.map(d => project(d.x, d.y, d.z));
 
-  /* pictures first — the lines are drawn over them, as in the reference */
   DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
-    const p = P[i], el = nodes[i], w = TILE * p.s;
-    const grow = i === hot ? 1.34 : 1;
-    const ww = w * grow, hh = w * .78 * grow;
-    el.style.transform = `translate(${p.x - ww / 2}px,${p.y - hh / 2}px)`;
-    el.style.width = ww + 'px'; el.style.height = hh + 'px';
-    el.style.opacity = hot < 0 ? Math.max(.52, Math.min(1, 1.55 - p.d / (dist * 2.8)))
-                               : (i === hot ? 1 : .42);
+    const p = P[i], el = nodes[i], grow = i === hot ? 1.3 : 1;
+    const w = TILE * p.s * grow, h = w * .78;
+    el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.opacity = hot < 0 ? Math.max(.5, Math.min(1, 1.5 - p.d / (dist * 2.8)))
+                               : (i === hot ? 1 : .34);
     el.style.zIndex = 1000 - Math.round(p.d / 4);
     el.classList.toggle('on', i === hot);
   });
 
-  ctx.lineWidth = 1;
-  if (hot < 0){
-    WEB.forEach(([a, b, rel]) => {
-      if (off.has(rel)) return;
-      const pa = P[a], pb = P[b];
-      if (!pa || !pb) return;
-      ctx.strokeStyle = rgba(META.rel[rel].color, .30);
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-    });
-  } else {
-    WEB.forEach(([a, b, rel]) => {
-      if (off.has(rel)) return;
-      const pa = P[a], pb = P[b];
-      if (!pa || !pb) return;
-      ctx.strokeStyle = rgba(META.rel[rel].color, .07);
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-    });
-    const p0 = P[hot];
-    tiesOf(hot).forEach(([j, rel]) => {
-      const pj = P[j];
-      if (!p0 || !pj) return;
-      ctx.strokeStyle = rgba(META.rel[rel].color, .82);
-      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(pj.x, pj.y); ctx.stroke();
-    });
-    showMeta(hot);
-  }
+  ALL.forEach(([a, b, r]) => {
+    if (off.has(r)) return;
+    const pa = P[a], pb = P[b];
+    if (!pa || !pb) return;
+    const on = hot >= 0 && (a === hot || b === hot);
+    const w = r === 'twin' ? 1.6 : 1;
+    ctx.lineWidth = on ? w + 1 : w;
+    ctx.strokeStyle = rgba(META.rel[r].color, hot < 0 ? (r === 'twin' ? .62 : .34) : (on ? .95 : .05));
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+  });
+
   ends.forEach(o => {
     const p = project(o.x, 0, 0);
     if (!p) { o.el.style.opacity = 0; return; }
     o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
-    o.el.style.opacity = .8;
-    o.el.style.fontSize = Math.max(10, Math.min(20, 13 * p.s * 1.4)) + 'px';
+    o.el.style.opacity = .75;
+    o.el.style.fontSize = Math.max(10, Math.min(19, 13 * p.s * 1.5)) + 'px';
   });
-  if (hot < 0) document.getElementById('meta').style.display = 'none';
+
+  hot >= 0 ? showMeta(hot) : (document.getElementById('meta').style.display = 'none');
 }
 
 function showMeta(i){
   const d = DATA[i], t = tiesOf(i);
-  const by = {};
-  t.forEach(([, rel]) => by[rel] = (by[rel] || 0) + 1);
+  const by = {}; t.forEach(([, r]) => by[r] = (by[r] || 0) + 1);
+  const away = t.filter(([j]) => DATA[j].theme !== d.theme).length;
   const el = document.getElementById('meta');
   el.style.display = 'block';
   el.innerHTML =
-    `<div class="r"><span>Title</span><b>${d.title}</b></div>
-     <div class="r"><span>Theme</span><b>${d.theme}</b></div>
+    `<div class="t">${d.title}</div>
      <div class="r"><span>Subject</span><b>${d.cat}</b></div>
-     <div class="r"><span>Divisions</span><b>${d.v} × ${d.h} — ${d.cells}</b></div>
-     <div class="ties">tied to <em style="color:#fff">${t.length}</em> pictures —
-       ${META.relOrder.filter(r => by[r]).map(r =>
-         `<em style="color:${META.rel[r].color}">${by[r]} ${META.rel[r].label.toLowerCase()}</em>`
-       ).join(', ')}</div>`;
+     <div class="r"><span>Divisions</span><b>${d.v} × ${d.h} = ${d.cells}</b></div>
+     <div class="r"><span>Weave</span><b>${d.weave > .3 ? 'vertical' : d.weave < -.3 ? 'horizontal' : 'square'}</b></div>
+     <div class="kin">${t.length
+        ? META.relOrder.filter(r => by[r]).map(r =>
+            `<em style="color:${META.rel[r].color}">${by[r]} ${META.rel[r].label.toLowerCase()}</em>`).join(' · ') +
+          `<br>${away} of ${t.length} reach a different subject`
+        : 'nothing in the archive is close enough to tie to'}</div>`;
 }
 
-/* ---------- view by ---------- */
-document.getElementById('rlist').innerHTML = META.relOrder.map(r =>
-  `<div class="rw" data-r="${r}"><i style="background:${META.rel[r].color}"></i>
-     <b>${META.rel[r].label}</b></div>`).join('');
-document.querySelectorAll('.rw').forEach(el => el.onclick = () => {
+document.getElementById('klist').innerHTML = META.relOrder.map(r => {
+  const k = META.rel[r];
+  return `<div class="kw" data-r="${r}">
+    <i style="background:${k.color}"></i>
+    <div class="b"><em>${k.label}<span>${k.n} · ${k.cross}% away</span></em>
+    <small>${k.rule}</small></div></div>`;
+}).join('');
+document.querySelectorAll('.kw').forEach(el => el.onclick = () => {
   const r = el.dataset.r;
   off.has(r) ? off.delete(r) : off.add(r);
   el.classList.toggle('off', off.has(r));
   paint();
 });
 
-document.getElementById('made').textContent = `${META.total} pictures`;
+const total = META.relOrder.reduce((s, r) => s + META.rel[r].n, 0);
+document.getElementById('made').innerHTML =
+  `${DATA.length} pictures · ${total} ties · ${(2 * total / DATA.length).toFixed(1)} each<br>
+   left to right: how many cells the picture is cut into`;
 
-/* ---------- navigation ---------- */
 addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
   document.body.classList.add('drag'); });
 addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
@@ -261,7 +225,7 @@ addEventListener('mousemove', e => {
 });
 addEventListener('wheel', e => {
   e.preventDefault();
-  dist = Math.max(420, Math.min(6000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+  dist = Math.max(420, Math.min(7000, dist * (e.deltaY > 0 ? 1.075 : .93)));
   paint();
 }, { passive: false });
 addEventListener('resize', paint);
@@ -269,10 +233,10 @@ addEventListener('resize', paint);
 let loaded = 0;
 world.querySelectorAll('img').forEach(img => {
   const tick = () => {
-    document.getElementById('boots').textContent = `${++loaded} of ${DATA.length}`;
+    document.getElementById('boots').textContent = `${++loaded} / ${DATA.length}`;
     if (loaded >= DATA.length) {
       paint();
-      setTimeout(() => document.getElementById('boot').classList.add('gone'), 250);
+      setTimeout(() => document.getElementById('boot').classList.add('gone'), 240);
     }
   };
   img.complete ? tick() : (img.onload = tick, img.onerror = tick);

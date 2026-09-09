@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Where these were found</title>
+<style>
+  :root{
+    --bg:#0b0b0c; --fg:#f4f3f0; --soft:#77746f; --line:rgba(255,255,255,.13);
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:12px;
+       overflow:hidden;-webkit-font-smoothing:antialiased;cursor:grab}
+  body.drag{cursor:grabbing}
+
+  #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #world{position:fixed;inset:0}
+  .node{position:absolute;will-change:transform;cursor:pointer}
+  .node img{display:block;width:100%;height:100%;object-fit:cover;background:#191919}
+  .node.on{z-index:9999!important}
+  .node.on img{box-shadow:0 14px 54px rgba(0,0,0,.7)}
+
+  .lab{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--fg);
+       letter-spacing:.15em;text-transform:uppercase;white-space:nowrap;z-index:30;opacity:.55}
+
+  .panel{position:fixed;z-index:40;background:rgba(11,11,12,.88);backdrop-filter:blur(10px);
+         border-radius:8px}
+  header{left:20px;top:18px;padding:12px 15px;max-width:290px}
+  header h1{margin:0;font-size:14px;font-weight:500;letter-spacing:-.012em}
+  header p{margin:5px 0 0;font-size:11px;color:var(--soft);line-height:1.55}
+
+  #kin{left:20px;bottom:18px;width:256px;padding:13px 15px 11px}
+  #kin h4{margin:0 0 10px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+          color:var(--soft);font-weight:400}
+  .kw{display:flex;align-items:flex-start;gap:10px;padding:6px 0;cursor:pointer;
+      user-select:none;border-top:1px solid var(--line)}
+  .kw i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px}
+  .kw .b{flex:1}
+  .kw .b em{font-style:normal;font-size:11px;font-weight:500;display:flex;
+            justify-content:space-between;gap:8px}
+  .kw .b em span{color:var(--soft);font-weight:400;font-variant-numeric:tabular-nums}
+  .kw .b small{display:block;color:var(--soft);font-size:10px;line-height:1.5;margin-top:2px}
+  .kw.off{opacity:.3}
+
+  #meta{right:20px;top:18px;width:240px;display:none;padding:13px 15px}
+  #meta .t{font-size:13px;font-weight:500;line-height:1.35;margin-bottom:9px}
+  #meta .r{display:flex;gap:12px;font-size:11px;padding:3px 0;border-top:1px solid var(--line)}
+  #meta .r span{color:var(--soft);width:64px;flex:none}
+  #meta .r b{font-weight:400;flex:1;text-align:right}
+  #meta .k{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);
+           font-size:11px;line-height:1.8;color:var(--soft)}
+  #meta .k em{font-style:normal}
+
+  .foot{right:20px;bottom:18px;padding:9px 13px;font-size:10px;color:var(--soft);
+        text-align:right;line-height:1.8}
+
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
+        justify-content:center;transition:opacity .7s}
+  #boot.gone{opacity:0;pointer-events:none}
+  #boot .s{font-size:11px;color:var(--soft);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<div id="world"></div>
+<canvas id="wire"></canvas>
+
+<header class="panel"><h1>Where these were found</h1><p>Real places only, set out like a site plan — home, street, workplace, shop, industry, land, gathering. Nothing here was made to be looked at; every grid was doing a job.</p></header>
+<div class="panel" id="kin"><h4>Kinship</h4><div id="klist"></div></div>
+<div class="panel" id="meta"></div>
+<div class="panel foot" id="foot"></div>
+
+<div id="boot"><div class="s" id="boots">0</div></div>
+
+<script src="../assets/plan.js?b=1"></script>
+<script>
+/* ------------------------------------------------------------------
+   The ties never change between these versions — only the sorting
+   does. Whichever way the archive is arranged, the same structural
+   kinships cut across it.
+------------------------------------------------------------------ */
+
+const world = document.getElementById('world');
+const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
+const TILE = META.tile, B = META.bounds;
+
+let camX = 0, camY = 150, dist = 5200, focal = 1400;
+let drag = false, lx = 0, ly = 0, moved = false, hot = -1, off = new Set();
+
+const ALL = [];
+META.order.forEach(r => META.ties[r].forEach(([a, b]) => ALL.push([a, b, r])));
+const tiesOf = i => ALL.filter(([a, b, r]) => !off.has(r) && (a === i || b === i))
+                       .map(([a, b, r]) => [a === i ? b : a, r]);
+
+const nodes = DATA.map((d, i) => {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.innerHTML = `<img src="${THUMB(d.thumb)}" alt="">`;
+  el.addEventListener('mouseenter', () => { hot = i; paint(); });
+  el.addEventListener('mouseleave', () => { hot = -1; paint(); });
+  el.addEventListener('click', () => { if (!moved && d.live) window.open(d.live, '_blank'); });
+  world.appendChild(el);
+  return el;
+});
+
+const labels = Object.entries(META.labels || {}).map(([t, p]) => {
+  const el = document.createElement('div');
+  el.className = 'lab'; el.textContent = t;
+  world.appendChild(el);
+  return { el, x: p[0], y: p[1] };
+});
+
+function project(x, y, z){
+  const d = z + dist;
+  if (d < 90) return null;
+  const s = focal / d;
+  return { x: innerWidth / 2 + (x - camX) * s, y: innerHeight / 2 + (y - camY) * s, s, d };
+}
+const refScale = () => focal / dist;
+const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`; };
+
+function paint(){
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+  const P = DATA.map(d => project(d.x, d.y, d.z));
+
+  DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
+    const p = P[i], el = nodes[i], grow = i === hot ? 1.3 : 1;
+    const w = TILE * p.s * grow, h = w * .78;
+    el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.opacity = hot < 0 ? Math.max(.42, Math.min(1, 1.5 - p.d / (dist * 2.6)))
+                               : (i === hot ? 1 : .3);
+    el.style.zIndex = 1000 - Math.round(p.d / 4);
+    el.classList.toggle('on', i === hot);
+  });
+
+  ALL.forEach(([a, b, r]) => {
+    if (off.has(r)) return;
+    const pa = P[a], pb = P[b];
+    if (!pa || !pb) return;
+    const on = hot >= 0 && (a === hot || b === hot);
+    const base = r === 'twin' ? 1.6 : 1;
+    ctx.lineWidth = on ? base + 1 : base;
+    ctx.strokeStyle = rgba(META.tieMeta[r].color,
+      hot < 0 ? (r === 'twin' ? .6 : .3) : (on ? .95 : .045));
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+  });
+
+  labels.forEach(o => {
+    const p = project(o.x, o.y - 620, 0);
+    if (!p) { o.el.style.opacity = 0; return; }
+    o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
+    o.el.style.opacity = hot < 0 ? .8 : .25;
+    o.el.style.fontSize = Math.max(9, Math.min(17, 12 * p.s * 1.3)) + 'px';
+  });
+
+  hot >= 0 ? showMeta(hot) : (document.getElementById('meta').style.display = 'none');
+}
+
+function showMeta(i){
+  const d = DATA[i], t = tiesOf(i);
+  const by = {}; t.forEach(([, r]) => by[r] = (by[r] || 0) + 1);
+  const el = document.getElementById('meta');
+  el.style.display = 'block';
+  el.innerHTML =
+    `<div class="t">${d.title}</div>
+     <div class="r"><span>Place</span><b>${d.place}</b></div>
+     <div class="r"><span>Divisions</span><b>${d.v} × ${d.h} = ${d.cells}</b></div>
+     <div class="k">${t.length
+        ? META.order.filter(r => by[r]).map(r =>
+            `<em style="color:${META.tieMeta[r].color}">${by[r]} ${META.tieMeta[r].label.toLowerCase()}</em>`).join(' · ')
+        : 'nothing close enough to tie to'}</div>`;
+}
+
+document.getElementById('klist').innerHTML = META.order.map(r => {
+  const k = META.tieMeta[r];
+  return `<div class="kw" data-r="${r}"><i style="background:${k.color}"></i>
+    <div class="b"><em>${k.label}<span>${k.n}</span></em><small>${k.rule}</small></div></div>`;
+}).join('');
+document.querySelectorAll('.kw').forEach(el => el.onclick = () => {
+  const r = el.dataset.r;
+  off.has(r) ? off.delete(r) : off.add(r);
+  el.classList.toggle('off', off.has(r));
+  paint();
+});
+document.getElementById('foot').innerHTML = `95 pictures · no graphic work at all`;
+
+addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
+  document.body.classList.add('drag'); });
+addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly) > 3) moved = true;
+  const s = refScale();
+  camX -= (e.clientX - lx) / s; camY -= (e.clientY - ly) / s;
+  lx = e.clientX; ly = e.clientY; paint();
+});
+addEventListener('wheel', e => {
+  e.preventDefault();
+  dist = Math.max(600, Math.min(9000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+  paint();
+}, { passive: false });
+addEventListener('resize', paint);
+
+let loaded = 0;
+world.querySelectorAll('img').forEach(img => {
+  const tick = () => {
+    document.getElementById('boots').textContent = `${++loaded} / ${DATA.length}`;
+    if (loaded >= DATA.length) { paint();
+      setTimeout(() => document.getElementById('boot').classList.add('gone'), 240); }
+  };
+  img.complete ? tick() : (img.onload = tick, img.onerror = tick);
+});
+paint();
+</script>
+</body>
+</html>

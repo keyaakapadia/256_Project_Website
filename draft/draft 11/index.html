@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Where it is found</title>
+<style>
+  :root{
+    --paper:#e8e5dd;      /* unbleached cloth */
+    --ink:#16150f;        /* warp — the thread held under tension */
+    --madder:#b3341f;     /* weft — the thread woven through it */
+    --soft:#8a8578;
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:12px;
+       overflow:hidden;-webkit-font-smoothing:antialiased}
+
+  header{position:fixed;left:34px;top:28px;z-index:20}
+  header h1{margin:0;font-size:19px;font-weight:500;letter-spacing:-.015em}
+  header p{margin:5px 0 0;font-size:11px;color:var(--soft);letter-spacing:.02em}
+
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #cloth{position:relative}
+  svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+  .warp{stroke:var(--ink);stroke-width:1.4;fill:none}
+  .weft{stroke:var(--madder);stroke-width:1.4;fill:none}
+
+  .cell{position:absolute;overflow:hidden;cursor:pointer}
+  .cell img{display:block;width:100%;height:100%;object-fit:cover;background:#d8d4c8;
+            transition:opacity .2s}
+  body.lit .cell img{opacity:.34}
+  body.lit .cell.on img{opacity:1}
+  .cell.on{outline:1px solid var(--madder);outline-offset:3px}
+
+  .colhead{position:absolute;text-align:center;font-size:10px;letter-spacing:.11em;
+           text-transform:uppercase;color:var(--soft);pointer-events:none}
+  .colhead.on{color:var(--madder)}
+
+  footer{position:fixed;left:34px;right:34px;bottom:26px;z-index:20;display:flex;
+         justify-content:space-between;align-items:baseline;gap:20px;pointer-events:none}
+  #read{font-size:13px;font-weight:500;min-height:18px;letter-spacing:-.01em}
+  #read span{color:var(--soft);font-weight:400;margin-left:9px;font-size:11px}
+  #key{font-size:10px;color:var(--soft);text-align:right;line-height:1.9;white-space:nowrap}
+  #key i{display:inline-block;width:15px;height:1.5px;vertical-align:3px;margin-right:6px}
+</style>
+</head>
+<body>
+
+<header><h1>Where it is found</h1><p>Real places only — seven of them, six pictures each. Nothing here was made to be looked at; every grid was doing a job.</p></header>
+
+<div id="stage"><div id="cloth"><svg id="threads"></svg></div></div>
+
+<footer>
+  <div id="read"></div>
+  <div id="key">
+    <i style="background:var(--ink)"></i>warp — the seven places these were found<br>
+    <i style="background:var(--madder)"></i>weft — how finely each picture is divided
+  </div>
+</footer>
+
+<script src="../assets/weave-place.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   A plain weave. Warp threads run down the gutters between columns,
+   weft threads run across the gutters between rows, and at every
+   crossing one passes over the other, alternating — which is how
+   cloth is actually made, and the oldest grid there is.
+
+   The pictures sit in the cells the weave creates. The threads that
+   separate them are the same threads that hold them together.
+------------------------------------------------------------------ */
+
+const NC = META.cols.length, NR = META.depth;
+const cloth = document.getElementById('cloth');
+const svg = document.getElementById('threads');
+const read = document.getElementById('read');
+
+/* weft thickness carries density: a busier picture is a heavier thread */
+const cells = DATA.map(d => d.cells);
+const lo = Math.log2(Math.max(1, Math.min(...cells))), hi = Math.log2(Math.max(...cells));
+const weight = d => {
+  const t = (Math.log2(Math.max(1, d.cells)) - lo) / (hi - lo || 1);
+  return 0.7 + t * 2.1;
+};
+
+const at = (c, r) => DATA.filter(d => d.col === META.cols[c])[r]
+                  || DATA[c * NR + r];
+
+function build(){
+  const availW = Math.max(360, innerWidth - 150), availH = Math.max(300, innerHeight - 200);
+  const g = Math.max(16, Math.min(30, availW / (NC * 7)));
+  const cs = Math.max(28, Math.min((availW - g * (NC + 1)) / NC, (availH - g * (NR + 1)) / NR));
+  const pitch = cs + g;
+  const W = NC * pitch + g, H = NR * pitch + g;
+  cloth.style.width = W + 'px'; cloth.style.height = H + 'px';
+  if (W <= 0 || H <= 0) return;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.width = W + 'px'; svg.style.height = H + 'px';
+
+  const X = k => g / 2 + k * pitch;          /* warp thread centres */
+  const Y = k => g / 2 + k * pitch;          /* weft thread centres */
+  const GAP = 7;                              /* where a thread dips under */
+
+  let p = '';
+  /* warp: vertical, dips under the weft on odd crossings */
+  for (let i = 0; i <= NC; i++){
+    const x = X(i);
+    let d = `M ${x} 0`, y = 0;
+    for (let j = 0; j <= NR; j++){
+      const yy = Y(j);
+      if ((i + j) % 2 === 1){ d += ` L ${x} ${yy - GAP} M ${x} ${yy + GAP}`; }
+    }
+    d += ` L ${x} ${H}`;
+    p += `<path class="warp" d="${d}"/>`;
+  }
+  /* weft: horizontal, dips under on even crossings, thickness = density of its row */
+  for (let j = 0; j <= NR; j++){
+    const y = Y(j);
+    let d = `M 0 ${y}`;
+    for (let i = 0; i <= NC; i++){
+      const x = X(i);
+      if ((i + j) % 2 === 0){ d += ` L ${x - GAP} ${y} M ${x + GAP} ${y}`; }
+    }
+    d += ` L ${W} ${y}`;
+    const row = DATA.filter((_, k) => k % NR === Math.min(j, NR - 1));
+    const wt = row.length ? row.reduce((s, d2) => s + weight(d2), 0) / row.length : 1.2;
+    p += `<path class="weft" d="${d}" style="stroke-width:${wt.toFixed(2)}"/>`;
+  }
+  svg.innerHTML = p;
+
+  cloth.querySelectorAll('.cell,.colhead').forEach(n => n.remove());
+  for (let c = 0; c < NC; c++){
+    const h = document.createElement('div');
+    h.className = 'colhead';
+    h.style.cssText = `left:${X(c) + g / 2}px;top:-24px;width:${cs}px`;
+    h.textContent = META.labels ? META.labels[c] : META.cols[c];
+    h.dataset.c = c;
+    cloth.appendChild(h);
+    for (let r = 0; r < NR; r++){
+      const d = at(c, r);
+      if (!d) continue;
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.style.cssText = `left:${X(c) + g / 2}px;top:${Y(r) + g / 2}px;width:${cs}px;height:${cs}px`;
+      el.innerHTML = `<img src="${THUMB(d.thumb)}" alt="">`;
+      el.onmouseenter = () => {
+        document.body.classList.add('lit');
+        el.classList.add('on');
+        h.classList.add('on');
+        read.innerHTML = `${d.title}<span>${d.v} × ${d.h} = ${d.cells} cells</span>`;
+      };
+      el.onmouseleave = () => {
+        document.body.classList.remove('lit');
+        el.classList.remove('on');
+        h.classList.remove('on');
+        read.textContent = '';
+      };
+      if (d.live) el.onclick = () => window.open(d.live, '_blank');
+      cloth.appendChild(el);
+    }
+  }
+}
+addEventListener('resize', build);
+build();
+</script>
+</body>
+</html>

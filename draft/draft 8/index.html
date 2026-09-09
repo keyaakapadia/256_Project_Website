@@ -37,19 +37,21 @@
 
   /* ---------- minimal chrome ---------- */
   .brand{position:fixed;left:24px;top:20px;z-index:30;font-size:30px;line-height:1;
-         letter-spacing:-.035em;font-weight:600}
-  .legend{position:fixed;left:24px;bottom:20px;z-index:30;display:flex;gap:14px;
-          flex-wrap:wrap;max-width:62vw}
+         letter-spacing:-.035em;font-weight:600;
+         background:var(--paper);padding:4px 10px 6px;margin:-4px -10px -6px}
+  .legend{position:fixed;left:18px;bottom:16px;z-index:30;display:flex;gap:13px;
+          flex-wrap:wrap;max-width:62vw;background:rgba(234,232,226,.94);padding:8px 12px}
   .lg{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.05em;
       color:var(--soft);cursor:pointer;user-select:none}
   .lg i{width:8px;height:8px;border-radius:50%;display:block}
   .lg.mute{opacity:.3}
   .lg:hover{color:var(--ink)}
-  .note{position:fixed;right:24px;bottom:20px;z-index:30;text-align:right;
-        font-size:10px;color:var(--soft);line-height:1.75}
+  .note{position:fixed;right:18px;bottom:16px;z-index:30;text-align:right;
+        font-size:10px;color:var(--soft);line-height:1.75;
+        background:rgba(234,232,226,.94);padding:8px 12px}
   .note b{color:var(--ink);font-weight:500}
-  .hint{position:fixed;right:24px;top:22px;z-index:30;font-size:10px;color:var(--soft);
-        text-align:right;line-height:1.7}
+  .hint{position:fixed;right:18px;top:18px;z-index:30;font-size:10px;color:var(--soft);
+        text-align:right;line-height:1.7;background:rgba(234,232,226,.94);padding:8px 12px}
 </style>
 </head>
 <body>
@@ -58,27 +60,30 @@
 <div id="world"></div>
 
 <div class="brand">256</div>
-<div class="hint">drag to turn · scroll to move in<br>hover to follow a tie</div>
+<div class="hint">drag to move · scroll to zoom<br>hover to follow a tie</div>
 <div class="legend" id="legend"></div>
 <div class="note" id="note"></div>
 
-<script src="../assets/data8.js?b=1"></script>
+<script src="../assets/data8.js?b=5"></script>
 <script>
 /* ------------------------------------------------------------------
-   Islands are themes. Height inside an island is how finely the
-   picture is divided. A tie joins two pictures cut into a similar
-   number of cells — which is why nearly all of them leave the island.
+   Islands are themes, spread across a plane. The camera never turns —
+   you pan across the field and dolly in. Depth only varies scale and
+   parallax, so nothing ever hides behind anything else.
+   A tie joins two pictures cut into a similar number of cells, which
+   is why almost every tie leaves its own island.
 ------------------------------------------------------------------ */
 
 const world = document.getElementById('world');
 const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
 const TILE = META.tile;
 
-let yaw = 0.5, pitch = -0.46, dist = 4600, focal = 1500;
-let drag = false, lx = 0, ly = 0, moved = false, idle = 0;
+const B = META.bounds;                       /* minX, minY, maxX, maxY */
+let camX = (B[0] + B[2]) / 2, camY = (B[1] + B[3]) / 2;
+let dist = 9200, focal = 1400;
+let drag = false, lx = 0, ly = 0, moved = false;
 let k = 3, hot = -1, muted = new Set();
 
-/* ---------- nodes ---------- */
 const nodes = DATA.map((d, i) => {
   const el = document.createElement('div');
   el.className = 'node';
@@ -93,7 +98,6 @@ const nodes = DATA.map((d, i) => {
   return el;
 });
 
-/* ---------- island labels ---------- */
 const isles = META.themes.map(t => {
   const el = document.createElement('div');
   el.className = 'isle';
@@ -103,16 +107,27 @@ const isles = META.themes.map(t => {
   return { t, el, p: META.centroids[t] };
 });
 
-/* ---------- 3d ---------- */
+/* straight-on projection; z only changes size and how fast a thing slides */
 function project(x, y, z){
-  const cy = Math.cos(yaw),  sy = Math.sin(yaw);
-  let X = x * cy - z * sy, Z = x * sy + z * cy;
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
-  let Y = y * cp - Z * sp;  Z = y * sp + Z * cp;
-  const d = Z + dist;
-  if (d < 120) return null;
+  const d = z + dist;
+  if (d < 90) return null;
   const s = focal / d;
-  return { x: innerWidth / 2 + X * s, y: innerHeight / 2 + Y * s, s, d };
+  return { x: innerWidth / 2 + (x - camX) * s, y: innerHeight / 2 + (y - camY) * s, s, d };
+}
+const refScale = () => focal / dist;
+
+/* a tie is drawn as a gradient between the two themes it joins, so a line
+   that changes colour along its length is a line that leaves its island */
+function rgba(hex, a){
+  const v = parseInt(hex.slice(1), 16);
+  return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`;
+}
+function tieStroke(pa, pb, ca, cb, a){
+  if (ca === cb) return rgba(ca, a);
+  const g = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
+  g.addColorStop(0, rgba(ca, a));
+  g.addColorStop(1, rgba(cb, a));
+  return g;
 }
 
 function kinOf(i){
@@ -132,73 +147,65 @@ function paint(){
   const kin = hot >= 0 ? kinOf(hot) : null;
   const live = i => !muted.has(DATA[i].theme);
 
-  /* ties first, so pictures sit on top of them */
   META.edges[String(k)].forEach(([a, b]) => {
     const pa = P[a], pb = P[b];
     if (!pa || !pb || !live(a) || !live(b)) return;
     const on = hot >= 0 && (a === hot || b === hot);
-    if (hot >= 0 && !on) { ctx.strokeStyle = 'rgba(19,18,16,.07)'; ctx.lineWidth = 1; }
-    else if (on)        { ctx.strokeStyle = DATA[hot].tc;          ctx.lineWidth = 1.6; }
-    else                { ctx.strokeStyle = 'rgba(19,18,16,.24)';  ctx.lineWidth = 1; }
+    const ca = DATA[a].tc, cb = DATA[b].tc;
+    if (hot >= 0 && !on) { ctx.strokeStyle = tieStroke(pa, pb, ca, cb, .05); ctx.lineWidth = 1; }
+    else if (on)         { ctx.strokeStyle = tieStroke(pa, pb, ca, cb, 1);   ctx.lineWidth = 2; }
+    else                 { ctx.strokeStyle = tieStroke(pa, pb, ca, cb, .34); ctx.lineWidth = 1; }
     ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
   });
 
-  /* pictures, far to near */
   const order = DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d);
   order.forEach(i => {
     const p = P[i], el = nodes[i], d = DATA[i];
     const w = TILE * p.s;
-    const dim = !live(i) ? .06
-              : hot < 0 ? Math.max(.30, Math.min(1, 1.55 - p.d / (dist * 1.5)))
-              : (i === hot ? 1 : kin.has(i) ? .95 : .13);
+    const far = Math.max(.42, Math.min(1, 1.5 - p.d / (dist * 2.4)));
+    const dim = !live(i) ? .05
+              : hot < 0 ? far
+              : (i === hot ? 1 : kin.has(i) ? .95 : .11);
     el.style.transform = `translate(${p.x - w / 2}px,${p.y - w / 2}px)`;
     el.style.width = w + 'px'; el.style.height = w + 'px';
     el.style.opacity = dim;
     el.style.zIndex = 10000 - Math.round(p.d);
     el.classList.toggle('on', i === hot);
     if (i === hot) {
-      const names = [...kin].filter(live).map(j => DATA[j].theme);
-      const other = [...new Set(names)].filter(t => t !== d.theme);
+      const other = [...new Set([...kin].filter(live).map(j => DATA[j].theme))]
+                      .filter(t => t !== d.theme);
       el.querySelector('.tag i').textContent =
-        `${d.cells} cells · ${d.theme}` +
-        (other.length ? ` → ties to ${other.join(', ')}` : '');
+        `${d.cells} cells · ${d.theme}` + (other.length ? ` → ties to ${other.join(', ')}` : '');
     }
   });
 
   isles.forEach(o => {
-    const p = project(o.p[0], o.p[1] - 620, o.p[2]);
+    const p = project(o.p[0], o.p[1] - 470, 0);
     if (!p) { o.el.style.opacity = 0; return; }
     o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
-    o.el.style.opacity = muted.has(o.t) ? .25 : Math.max(.25, Math.min(.95, p.s * 2.1));
-    o.el.style.fontSize = Math.max(9, Math.min(15, 11 * p.s * 2.2)) + 'px';
+    o.el.style.opacity = muted.has(o.t) ? .28 : .9;
+    o.el.style.fontSize = Math.max(9, Math.min(16, 11 * p.s * 1.15)) + 'px';
   });
 }
 
-/* ---------- interaction ---------- */
 addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
   document.body.classList.add('drag'); });
 addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
 addEventListener('mousemove', e => {
   if (!drag) return;
   if (Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly) > 3) moved = true;
-  yaw += (e.clientX - lx) * .005;
-  pitch = Math.max(-.85, Math.min(.85, pitch + (e.clientY - ly) * .004));
-  lx = e.clientX; ly = e.clientY; idle = 0; paint();
+  const s = refScale();
+  camX -= (e.clientX - lx) / s;
+  camY -= (e.clientY - ly) / s;
+  lx = e.clientX; ly = e.clientY;
+  paint();
 });
 addEventListener('wheel', e => {
   e.preventDefault();
-  dist = Math.max(700, Math.min(7000, dist * (e.deltaY > 0 ? 1.08 : .926)));
-  idle = 0; paint();
+  dist = Math.max(380, Math.min(13000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+  paint();
 }, { passive: false });
 
-/* a slow drift so the depth reads without anyone touching it */
-function loop(){
-  idle++;
-  if (idle > 90 && !drag && hot < 0) { yaw += .0011; paint(); }
-  requestAnimationFrame(loop);
-}
-
-/* legend doubles as a theme filter */
 document.getElementById('legend').innerHTML = META.themes.map(t =>
   `<div class="lg" data-t="${t}"><i style="background:${META.color[t]}"></i>${t}</div>`).join('');
 document.querySelectorAll('.lg').forEach(el => el.onclick = () => {
@@ -210,10 +217,11 @@ document.querySelectorAll('.lg').forEach(el => el.onclick = () => {
 
 document.getElementById('note').innerHTML =
   `<b>${META.total}</b> pictures in <b>${META.themes.length}</b> themes<br>
-   <b>${META.crossShare}%</b> of ties leave their own theme`;
+   <b>${META.crossShare}%</b> of ties leave their own theme —<br>
+   those are the two-coloured lines`;
 
 addEventListener('resize', paint);
-paint(); loop();
+paint();
 </script>
 </body>
 </html>

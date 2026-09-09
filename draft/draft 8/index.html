@@ -65,7 +65,7 @@
 <div id="world"></div>
 <canvas id="wire"></canvas>
 
-<div class="panel hint">hover a picture to see what it is tied to</div>
+<div class="panel hint">left to right: how many cells the picture is cut into · hover to see its ties</div>
 <div class="panel" id="viewby"><h4>View by</h4><div id="rlist"></div></div>
 <div class="panel" id="meta"></div>
 <div class="panel brand">256 Project, CD Thesis</div>
@@ -73,7 +73,7 @@
 
 <div id="boot"><div class="n" id="bootn">Welcome…</div><div class="s" id="boots">0 of 144</div></div>
 
-<script src="../assets/data9.js?b=1"></script>
+<script src="../assets/data9.js?b=2"></script>
 <script>
 /* ------------------------------------------------------------------
    Five relationships, five colours, all drawn at once. Any two
@@ -138,6 +138,16 @@ const nodes = DATA.map((d, i) => {
   return el;
 });
 
+/* the field runs along one measured axis; say so, out in the space itself */
+const ends = [['few divisions', B[0] - 260], ['many divisions', B[2] + 260]].map(([t, x]) => {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:absolute;color:#7d7a75;font-size:12px;letter-spacing:.14em;'+
+    'text-transform:uppercase;white-space:nowrap;transform:translate(-50%,-50%);pointer-events:none';
+  el.textContent = t;
+  world.appendChild(el);
+  return { el, x };
+});
+
 function project(x, y, z){
   const d = z + dist;
   if (d < 80) return null;
@@ -198,6 +208,13 @@ function paint(){
     });
     showMeta(hot);
   }
+  ends.forEach(o => {
+    const p = project(o.x, 0, 0);
+    if (!p) { o.el.style.opacity = 0; return; }
+    o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
+    o.el.style.opacity = .8;
+    o.el.style.fontSize = Math.max(10, Math.min(20, 13 * p.s * 1.4)) + 'px';
+  });
   if (hot < 0) document.getElementById('meta').style.display = 'none';
 }
 

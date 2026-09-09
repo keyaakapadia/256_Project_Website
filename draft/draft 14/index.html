@@ -74,7 +74,7 @@
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
-<script src="../assets/plan.js?b=1"></script>
+<script src="../assets/plan.js?b=3"></script>
 <script>
 /* ------------------------------------------------------------------
    The ties never change between these versions — only the sorting
@@ -86,7 +86,7 @@ const world = document.getElementById('world');
 const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
 const TILE = META.tile, B = META.bounds;
 
-let camX = 0, camY = 150, dist = 5200, focal = 1400;
+let camX = 0, camY = -40, dist = 3680, focal = 1400;
 let drag = false, lx = 0, ly = 0, moved = false, hot = -1, off = new Set();
 
 const ALL = [];
@@ -155,7 +155,7 @@ function paint(){
   });
 
   labels.forEach(o => {
-    const p = project(o.x, o.y - 620, 0);
+    const p = project(o.x, o.y - 430, 0);
     if (!p) { o.el.style.opacity = 0; return; }
     o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
     o.el.style.opacity = hot < 0 ? .8 : .25;

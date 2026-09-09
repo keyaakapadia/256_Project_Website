@@ -27,22 +27,7 @@
 
   .panel{position:fixed;z-index:40;background:rgba(11,11,12,.88);backdrop-filter:blur(10px);
          border-radius:8px}
-  header{left:20px;top:18px;padding:12px 15px;max-width:290px}
-  header h1{margin:0;font-size:14px;font-weight:500;letter-spacing:-.012em}
-  header p{margin:5px 0 0;font-size:11px;color:var(--soft);line-height:1.55}
 
-  #kin{left:20px;bottom:18px;width:256px;padding:13px 15px 11px}
-  #kin h4{margin:0 0 10px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
-          color:var(--soft);font-weight:400}
-  .kw{display:flex;align-items:flex-start;gap:10px;padding:6px 0;cursor:pointer;
-      user-select:none;border-top:1px solid var(--line)}
-  .kw i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px}
-  .kw .b{flex:1}
-  .kw .b em{font-style:normal;font-size:11px;font-weight:500;display:flex;
-            justify-content:space-between;gap:8px}
-  .kw .b em span{color:var(--soft);font-weight:400;font-variant-numeric:tabular-nums}
-  .kw .b small{display:block;color:var(--soft);font-size:10px;line-height:1.5;margin-top:2px}
-  .kw.off{opacity:.3}
 
   #meta{right:20px;top:18px;width:240px;display:none;padding:13px 15px}
   #meta .t{font-size:13px;font-weight:500;line-height:1.35;margin-bottom:9px}
@@ -53,8 +38,6 @@
            font-size:11px;line-height:1.8;color:var(--soft)}
   #meta .k em{font-style:normal}
 
-  .foot{right:20px;bottom:18px;padding:9px 13px;font-size:10px;color:var(--soft);
-        text-align:right;line-height:1.8}
 
   #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
         justify-content:center;transition:opacity .7s}
@@ -67,10 +50,7 @@
 <div id="world"></div>
 <canvas id="wire"></canvas>
 
-<header class="panel"><h1>Where these were found</h1><p>Real places only, set out like a site plan — home, street, workplace, shop, industry, land, gathering. Nothing here was made to be looked at; every grid was doing a job.</p></header>
-<div class="panel" id="kin"><h4>Kinship</h4><div id="klist"></div></div>
 <div class="panel" id="meta"></div>
-<div class="panel foot" id="foot"></div>
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
@@ -87,7 +67,8 @@ const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
 const TILE = META.tile, B = META.bounds;
 
 let camX = 0, camY = -40, dist = 3680, focal = 1400;
-let drag = false, lx = 0, ly = 0, moved = false, hot = -1, off = new Set();
+let drag = false, lx = 0, ly = 0, moved = false, hot = -1;
+const off = new Set();
 
 const ALL = [];
 META.order.forEach(r => META.ties[r].forEach(([a, b]) => ALL.push([a, b, r])));
@@ -180,18 +161,6 @@ function showMeta(i){
         : 'nothing close enough to tie to'}</div>`;
 }
 
-document.getElementById('klist').innerHTML = META.order.map(r => {
-  const k = META.tieMeta[r];
-  return `<div class="kw" data-r="${r}"><i style="background:${k.color}"></i>
-    <div class="b"><em>${k.label}<span>${k.n}</span></em><small>${k.rule}</small></div></div>`;
-}).join('');
-document.querySelectorAll('.kw').forEach(el => el.onclick = () => {
-  const r = el.dataset.r;
-  off.has(r) ? off.delete(r) : off.add(r);
-  el.classList.toggle('off', off.has(r));
-  paint();
-});
-document.getElementById('foot').innerHTML = `95 pictures · no graphic work at all`;
 
 addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
   document.body.classList.add('drag'); });

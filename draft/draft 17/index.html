@@ -90,7 +90,7 @@
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
-<script src="../assets/kin16.js?b=7"></script>
+<script src="../assets/kin16.js?b=9"></script>
 <script>
 /* ------------------------------------------------------------------
    Where a picture sits is where the grid was found.
@@ -116,7 +116,7 @@ function buildFocus(i){
   const base = DATA.map(d => d[view].slice());
   const out = base.map(p => p.slice());
   out[i] = [0, 0, 0];
-  const R0 = 1020, RING = 470;
+  const R0 = dist * 0.26, RING = dist * 0.115;   /* constant on screen, whatever the view */
   ln.forEach(([j], k) => {
     const ring = Math.floor(k / 12), inRing = k % 12, per = Math.min(12, ln.length - ring * 12);
     const a = (inRing / per) * Math.PI * 2 - Math.PI / 2 + ring * 0.26;
@@ -127,7 +127,7 @@ function buildFocus(i){
   base.forEach((p, j) => {                       /* everything else drifts to the rim */
     if (j === i || kin.has(j)) return;
     const d = Math.hypot(p[0], p[1]) || 1;
-    out[j] = [p[0] / d * 4200, p[1] / d * 4200, p[2]];
+    out[j] = [p[0] / d * dist * 0.85, p[1] / d * dist * 0.85, p[2]];
   });
   return out;
 }

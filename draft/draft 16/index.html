@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kin</title>
+<style>
+  :root{
+    --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85; --gold:#ffc23d;
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:13px;
+       overflow:hidden;-webkit-font-smoothing:antialiased;cursor:grab}
+  body.drag{cursor:grabbing}
+  body.overline{cursor:pointer}
+
+  #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #world{position:fixed;inset:0}
+  .node{position:absolute;will-change:transform}
+  .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
+            pointer-events:auto;cursor:pointer}
+  .node.front{z-index:9000!important}
+
+  .place{position:absolute;transform:translate(-50%,-50%);pointer-events:none;
+         color:var(--soft);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+
+  nav{position:fixed;left:50%;top:20px;transform:translateX(-50%);z-index:40;display:flex;gap:3px;
+      background:rgba(27,27,27,.84);backdrop-filter:blur(12px);padding:4px;border-radius:24px}
+  nav button{background:none;border:0;color:var(--soft);font:inherit;font-size:14px;
+             padding:7px 18px;border-radius:20px;cursor:pointer}
+  nav button:hover{color:var(--fg)}
+  nav button.on{color:var(--fg);background:rgba(255,255,255,.11)}
+
+  #key{position:fixed;left:30px;top:50%;transform:translateY(-50%);z-index:40;
+       background:rgba(27,27,27,.84);backdrop-filter:blur(12px);padding:15px 18px 13px;
+       border-radius:10px}
+  #key h4{margin:0 0 11px;font-size:12px;color:var(--soft);font-weight:400}
+  .m{display:flex;align-items:center;gap:10px;padding:3px 0;cursor:pointer;user-select:none;
+     color:var(--soft);font-size:13px}
+  .m i{width:9px;height:9px;border-radius:50%;flex:none;opacity:.55}
+  .m u{text-decoration:none;flex:1}
+  .m s{text-decoration:none;font-size:11px;opacity:.5;font-variant-numeric:tabular-nums}
+  .m:hover,.m.on{color:var(--fg)} .m.on i,.m:hover i{opacity:1}
+  .m.dim{opacity:.32}
+
+  #card{position:fixed;right:30px;top:50%;transform:translateY(-50%);z-index:40;width:250px;
+        display:none;background:rgba(27,27,27,.84);backdrop-filter:blur(12px);
+        padding:16px 18px;border-radius:10px}
+  #card .t{font-size:15px;font-weight:500;line-height:1.3;margin-bottom:12px}
+  #card .r{display:flex;gap:14px;padding:4px 0;font-size:13px}
+  #card .r span{color:var(--soft);width:78px;flex:none}
+  #card .r b{font-weight:400;flex:1}
+  #card .hint{margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.13);
+              font-size:11px;color:var(--soft);line-height:1.6}
+
+  #sub{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:40;font-size:12px;
+       color:var(--soft);background:rgba(27,27,27,.84);padding:7px 15px;border-radius:16px}
+
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
+        justify-content:center;transition:opacity .7s}
+  #boot.gone{opacity:0;pointer-events:none}
+  #boot .s{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<div id="world"></div>
+<canvas id="wire"></canvas>
+
+<nav id="tabs"></nav>
+<div id="key"><h4>What the grid does</h4><div id="klist"></div></div>
+<div id="card"></div>
+<div id="sub"></div>
+
+<div id="boot"><div class="s" id="boots">0</div></div>
+
+<script src="../assets/kin150.js?b=4"></script>
+<script>
+/* ------------------------------------------------------------------
+   Where a picture sits is where the grid was found.
+   A line means two pictures are doing the same thing, and its colour
+   says which thing — cool where the grid holds tightest, warm where
+   it loosens. Follow a line to travel to the other end.
+------------------------------------------------------------------ */
+
+const world = document.getElementById('world');
+const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
+const TILE = META.tile, GOLD = META.gold;
+
+let view = 'map';
+let camX = 0, camY = 0, dist = META.views.map.dist, focal = 1400;
+let drag = false, lx = 0, ly = 0, moved = false;
+let hot = -1, pinned = -1, hotLine = -1, muted = new Set();
+let pos = DATA.map(d => d[view].slice());
+let P = [], segs = [];
+
+const kinOf = i => META.groups[DATA[i].meaning].filter(j => j !== i);
+
+/* ---------- pictures ---------- */
+const nodes = DATA.map((d, i) => {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.innerHTML = `<img src="${THUMB(d.thumb)}" alt="">`;
+  el.querySelector('img').addEventListener('mouseenter', () => { hot = i; paint(); });
+  el.querySelector('img').addEventListener('mouseleave', () => { hot = -1; paint(); });
+  el.querySelector('img').addEventListener('click', e => {
+    e.stopPropagation();
+    if (moved) return;
+    pinned = pinned === i ? -1 : i;
+    paint();
+  });
+  world.appendChild(el);
+  return el;
+});
+addEventListener('click', () => { if (!moved && hotLine < 0 && pinned >= 0) { pinned = -1; paint(); } });
+
+const places = META.places.map(p => {
+  const el = document.createElement('div');
+  el.className = 'place'; el.textContent = p;
+  world.appendChild(el);
+  return { p, el, at: META.placeAt[p] };
+});
+
+function project(x, y, z){
+  const d = z + dist;
+  if (d < 90) return null;
+  const s = focal / d;
+  return { x: innerWidth / 2 + (x - camX) * s, y: innerHeight / 2 + (y - camY) * s, s, d };
+}
+const refScale = () => focal / dist;
+const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`; };
+
+function paint(){
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+  P = pos.map(p => project(p[0], p[1], p[2]));
+  const focusI = pinned >= 0 ? pinned : hot;
+  const kin = focusI >= 0 ? new Set(kinOf(focusI)) : null;
+  const live = i => !muted.has(DATA[i].meaning);
+
+  /* pictures */
+  DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
+    const p = P[i], el = nodes[i], big = i === focusI ? 1.42 : 1;
+    const w = TILE * p.s * big, h = w * .8;
+    el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.opacity = !live(i) ? .12
+      : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .26);
+    el.style.zIndex = 1000 - Math.round(p.d / 4);
+    el.classList.toggle('front', i === focusI);
+  });
+
+  /* lines only for the picture in hand — everything else stays quiet */
+  segs = [];
+  if (focusI >= 0 && live(focusI)){
+    const col = META.mcol[DATA[focusI].meaning];
+    const p0 = P[focusI];
+    kinOf(focusI).forEach(j => {
+      if (!P[j] || !live(j)) return;
+      segs.push({ a: p0, b: P[j], j });
+    });
+    segs.forEach((s, k) => {
+      const on = k === hotLine;
+      ctx.strokeStyle = on ? GOLD : rgba(col, .8);
+      ctx.lineWidth = on ? 2.4 : 1.2;
+      ctx.beginPath(); ctx.moveTo(s.a.x, s.a.y); ctx.lineTo(s.b.x, s.b.y); ctx.stroke();
+    });
+    if (hotLine >= 0 && segs[hotLine]){
+      const t = segs[hotLine].b;
+      ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(t.x - TILE * t.s / 2 - 4, t.y - TILE * t.s * .4 - 4,
+                     TILE * t.s + 8, TILE * t.s * .8 + 8);
+    }
+    showCard(focusI, kin.size);
+  } else {
+    document.getElementById('card').style.display = 'none';
+  }
+
+  places.forEach(o => {
+    const p = project(o.at[0], o.at[1] - (META.labelLift[o.p] || 520), 0);
+    if (!p || view !== 'map') { o.el.style.opacity = 0; return; }
+    o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
+    o.el.style.opacity = focusI < 0 ? .85 : .3;
+    o.el.style.fontSize = Math.max(9, Math.min(15, 11 * p.s * 1.4)) + 'px';
+  });
+}
+
+function showCard(i, k){
+  const d = DATA[i], el = document.getElementById('card');
+  el.style.display = 'block';
+  el.innerHTML =
+    `<div class="t">${d.title}</div>
+     <div class="r"><span>Does</span><b style="color:${META.mcol[d.meaning]}">${d.meaning}</b></div>
+     <div class="r"><span>Found in</span><b>${d.place}</b></div>
+     <div class="r"><span>Grid of</span><b>${d.v} × ${d.h}</b></div>
+     <div class="r"><span>Same doing</span><b>${k} others</b></div>
+     ${pinned === i ? '<div class="hint">Follow a line to jump to the other picture.</div>'
+                    : '<div class="hint">Click to hold it in front.</div>'}`;
+}
+
+/* ---------- following a line ---------- */
+function nearestSeg(mx, my){
+  let best = -1, bd = 9;
+  segs.forEach((s, k) => {
+    const dx = s.b.x - s.a.x, dy = s.b.y - s.a.y;
+    const L = dx * dx + dy * dy; if (!L) return;
+    let t = ((mx - s.a.x) * dx + (my - s.a.y) * dy) / L;
+    t = Math.max(.08, Math.min(1, t));            /* ignore the stub under the picture */
+    const px = s.a.x + dx * t, py = s.a.y + dy * t;
+    const d = Math.hypot(mx - px, my - py);
+    if (d < bd) { bd = d; best = k; }
+  });
+  return best;
+}
+addEventListener('mousemove', e => {
+  if (drag || segs.length === 0) return;
+  const k = nearestSeg(e.clientX, e.clientY);
+  if (k !== hotLine){ hotLine = k; document.body.classList.toggle('overline', k >= 0); paint(); }
+});
+addEventListener('click', e => {
+  if (moved || hotLine < 0 || !segs[hotLine]) return;
+  const j = segs[hotLine].j;
+  hotLine = -1; document.body.classList.remove('overline');
+  flyTo(j);
+});
+function flyTo(j){
+  pinned = j;                                   /* select first — the camera only catches up */
+  const t = pos[j], fx = camX, fy = camY, t0 = performance.now(), T = 620;
+  paint();
+  (function step(now){
+    const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
+    camX = fx + (t[0] - fx) * e; camY = fy + (t[1] - fy) * e;
+    paint();
+    if (u < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* ---------- views ---------- */
+let anim = null;
+function goto(v){
+  view = v; dist = META.views[v].dist; camX = camY = 0;
+  document.getElementById('sub').textContent = META.views[v].sub;
+  const from = pos.map(p => p.slice()), to = DATA.map(d => d[v]);
+  const t0 = performance.now(), T = 950;
+  cancelAnimationFrame(anim);
+  (function step(now){
+    const u = Math.min(1, (now - t0) / T);
+    const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    pos = from.map((p, i) => [p[0] + (to[i][0] - p[0]) * e, p[1] + (to[i][1] - p[1]) * e,
+                              p[2] + (to[i][2] - p[2]) * e]);
+    paint();
+    if (u < 1) anim = requestAnimationFrame(step);
+  })(t0);
+  setTimeout(() => { pos = DATA.map(d => d[v].slice()); paint(); }, T + 60);
+}
+document.getElementById('tabs').innerHTML = META.viewOrder.map(v =>
+  `<button data-v="${v}" class="${v === view ? 'on' : ''}">${META.views[v].label}</button>`).join('');
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(o => o.classList.toggle('on', o === b));
+  goto(b.dataset.v);
+});
+
+document.getElementById('klist').innerHTML = META.meanings.map(m =>
+  `<div class="m" data-m="${m}"><i style="background:${META.mcol[m]}"></i>
+     <u>${m}</u><s>${META.mcount[m]}</s></div>`).join('');
+document.querySelectorAll('.m').forEach(el => el.onclick = () => {
+  const m = el.dataset.m;
+  muted.has(m) ? muted.delete(m) : muted.add(m);
+  el.classList.toggle('dim', muted.has(m));
+  paint();
+});
+document.getElementById('sub').textContent = META.views.map.sub;
+
+addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
+  document.body.classList.add('drag'); });
+addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly) > 3) moved = true;
+  const s = refScale();
+  camX -= (e.clientX - lx) / s; camY -= (e.clientY - ly) / s;
+  lx = e.clientX; ly = e.clientY; paint();
+});
+addEventListener('wheel', e => {
+  e.preventDefault();
+  dist = Math.max(700, Math.min(12000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+  paint();
+}, { passive: false });
+addEventListener('resize', paint);
+
+let loaded = 0;
+world.querySelectorAll('img').forEach(img => {
+  const tick = () => {
+    document.getElementById('boots').textContent = `${++loaded} / ${DATA.length}`;
+    if (loaded >= DATA.length) { paint();
+      setTimeout(() => document.getElementById('boot').classList.add('gone'), 240); }
+  };
+  img.complete ? tick() : (img.onload = tick, img.onerror = tick);
+});
+paint();
+</script>
+</body>
+</html>

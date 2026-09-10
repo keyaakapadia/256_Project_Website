@@ -335,7 +335,6 @@ function showCard(i, k, ln){
         `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
      <div class="r"><span>Found in</span><b>${d.place}</b></div>
      <div class="r"><span>Seen</span><b>${seen}</b></div>
-     <div class="r"><span>Grid of</span><b>${d.v && d.h ? d.v + ' × ' + d.h : 'no visible divisions'}</b></div>
      <div class="r"><span>Joined to</span><b>${k} pictures</b></div>
      <div class="hint">${META.meanings.filter(m => by[m]).map(m =>
         `<span style="color:${META.mcol[m]}">${by[m]} ${m}</span>`).join(' · ')}

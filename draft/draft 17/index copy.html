@@ -24,24 +24,22 @@
         transition:transform .55s cubic-bezier(.3,.8,.3,1)}
   .node.flip .card{transform:rotateY(180deg)}
   .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-  .back{transform:rotateY(180deg);background:#efece2;color:#17150f;
-        padding:24px 26px;display:flex;flex-direction:column;justify-content:center;
-        cursor:pointer}
-  .back .t{font-size:17px;font-weight:500;line-height:1.26;margin-bottom:16px;
-           letter-spacing:-.012em}
+  .back{transform:rotateY(180deg);background:#141414;color:var(--fg);
+        padding:20px 22px;display:flex;flex-direction:column;justify-content:center;
+        border:1px solid rgba(255,255,255,.14)}
+  .back .t{font-size:16px;font-weight:500;line-height:1.28;margin-bottom:14px}
   .back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
-  .back .r span{color:#8b8779;width:78px;flex:none}
+  .back .r span{color:var(--soft);width:76px;flex:none}
   .back .r b{font-weight:400;flex:1}
-  .back .k{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.16);
-           font-size:12px;line-height:1.7;color:#8b8779}
+  .back .k{margin-top:13px;padding-top:11px;border-top:1px solid rgba(255,255,255,.14);
+           font-size:12px;line-height:1.7;color:var(--soft)}
   .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
             pointer-events:auto;cursor:pointer}
   .node .wash{position:absolute;inset:0;mix-blend-mode:screen;opacity:.20;
               pointer-events:none;transition:opacity .25s}
   .node.held .wash{opacity:0}
   .node.front{z-index:9000!important}
-  .node.held{filter:drop-shadow(0 26px 70px rgba(0,0,0,.75))}
-  .node.held .front{background:#efece2;padding:13px}
+  .node.held{background:#efece2;padding:14px;box-shadow:0 30px 90px rgba(0,0,0,.75)}
 
   .place{position:absolute;transform:translate(-50%,-50%);pointer-events:none;
          color:var(--soft);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
@@ -126,7 +124,7 @@ const TILE = META.tile, GOLD = META.gold;
 
 let view = 'map';
 let focal = 1400, dist = META.views.map.dist;
-let camX = 0, camY = 0;
+let camX = -300 * dist / focal, camY = 0;
 let drag = false, lx = 0, ly = 0, moved = false;
 let hot = -1, pinned = -1, hotLine = -1;
 let pos = DATA.map(d => d[view].slice());
@@ -434,7 +432,7 @@ function flyTo(j){
 /* ---------- views ---------- */
 let anim = null;
 function goto(v){
-  view = v; dist = META.views[v].dist; camX = 0; camY = 0;
+  view = v; dist = META.views[v].dist; camX = -300 * dist / focal; camY = 0;
   pinned = -1; focusPos = null;
   const from = pos.map(p => p.slice()), to = DATA.map(d => d[v]);
   const t0 = performance.now(), T = 950;

@@ -19,31 +19,53 @@
   #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
   #world{position:fixed;inset:0}
   .node{position:absolute;will-change:transform}
+  .node{perspective:1400px}
+  .card{position:absolute;inset:0;transform-style:preserve-3d;
+        transition:transform .55s cubic-bezier(.3,.8,.3,1)}
+  .node.flip .card{transform:rotateY(180deg)}
+  .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .back{transform:rotateY(180deg);background:#efece2;color:#17150f;
+        padding:24px 26px;display:flex;flex-direction:column;justify-content:center;
+        cursor:pointer}
+  .back .t{font-size:17px;font-weight:500;line-height:1.26;margin-bottom:16px;
+           letter-spacing:-.012em}
+  .back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
+  .back .r span{color:#8b8779;width:78px;flex:none}
+  .back .r b{font-weight:400;flex:1}
+  .back .k{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.16);
+           font-size:12px;line-height:1.7;color:#8b8779}
   .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
             pointer-events:auto;cursor:pointer}
   .node .wash{position:absolute;inset:0;mix-blend-mode:screen;opacity:.20;
               pointer-events:none;transition:opacity .25s}
   .node.held .wash{opacity:0}
   .node.front{z-index:9000!important}
-  .node.held{background:#efece2;padding:14px;box-shadow:0 30px 90px rgba(0,0,0,.75)}
+  .node.held{filter:drop-shadow(0 26px 70px rgba(0,0,0,.75))}
+  .node.held .front{background:#efece2;padding:13px}
 
   .place{position:absolute;transform:translate(-50%,-50%);pointer-events:none;
          color:var(--soft);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 
-  #rail{position:fixed;left:30px;top:34px;bottom:34px;z-index:40;width:214px;
-        display:flex;flex-direction:column;gap:22px}
-  .box{background:rgba(24,24,24,.80);backdrop-filter:blur(14px);padding:15px 17px 14px;
+  #rail{position:fixed;left:30px;bottom:30px;z-index:40}
+  .box{background:rgba(24,24,24,.80);backdrop-filter:blur(14px);padding:14px 18px 13px;
        border-radius:2px;border-left:2px solid rgba(255,255,255,.16)}
+  #klist{display:grid;grid-template-columns:repeat(3,minmax(96px,1fr));gap:0 20px}
+  .col{display:flex;flex-direction:column}
   .box h4{margin:0 0 11px;font-size:10px;letter-spacing:.19em;text-transform:uppercase;
           color:var(--soft);font-weight:400}
-  nav{display:flex;flex-direction:column;gap:1px}
-  nav button{background:none;border:0;color:var(--soft);font:inherit;font-size:15px;
-             padding:5px 0 5px 16px;cursor:pointer;text-align:left;position:relative;
-             letter-spacing:-.01em}
-  nav button::before{content:"";position:absolute;left:0;top:50%;width:6px;height:6px;
-    margin-top:-3px;background:currentColor;opacity:0;transition:opacity .15s}
-  nav button:hover{color:var(--fg)}
-  nav button.on{color:var(--fg)} nav button.on::before{opacity:1}
+  nav{position:fixed;right:30px;top:28px;z-index:40;display:flex;gap:6px;
+      background:rgba(24,24,24,.80);backdrop-filter:blur(14px);padding:6px;border-radius:2px}
+  nav button{background:none;border:0;width:38px;height:38px;cursor:pointer;padding:0;
+             color:var(--soft);display:grid;place-items:center;border-radius:2px;
+             transition:.15s;position:relative}
+  nav button:hover{color:var(--fg);background:rgba(255,255,255,.06)}
+  nav button.on{color:#141414;background:var(--fg)}
+  nav svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.5;
+          stroke-linecap:round;stroke-linejoin:round}
+  nav button i{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);
+    font-style:normal;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--soft);opacity:0;transition:.15s;white-space:nowrap;pointer-events:none}
+  nav button:hover i{opacity:1}
 
 
   .m{display:flex;align-items:center;gap:10px;padding:3px 0;cursor:pointer;user-select:none;
@@ -53,10 +75,9 @@
   .m s{text-decoration:none;font-size:11px;opacity:.5;font-variant-numeric:tabular-nums}
   .m:hover,.m.on{color:var(--fg)} .m.on i,.m:hover i{opacity:1}
   .m.dim{opacity:.28}
-  .fam{font-size:9px;letter-spacing:.12em;text-transform:uppercase;
-       color:#5f5c58;margin:11px 0 4px}
-  .fam:first-child{margin-top:0}
-  .m.all{margin-top:8px;padding-top:9px;border-top:1px solid rgba(255,255,255,.12);font-size:12px}
+  .fam{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5f5c58;
+       margin:0 0 6px;line-height:1.35;min-height:26px}
+  .m.all{margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);font-size:12px}
   .m.all i{display:none}
 
   #card{position:fixed;right:30px;top:50%;transform:translateY(-50%);z-index:40;width:250px;
@@ -82,10 +103,10 @@
 <div id="world"></div>
 <canvas id="wire"></canvas>
 
-<div id="rail">
-  <div class="box"><h4>See them</h4><nav id="tabs"></nav></div>
-  <div class="box" id="key"><h4>What the grid does</h4><div id="klist"></div></div>
-</div>
+<nav id="tabs"></nav>
+<div id="rail"><div class="box" id="key"><h4>What the grid does</h4>
+  <div id="klist"></div>
+  <div class="m all" data-m="">show everything</div></div></div>
 <div id="card"></div>
 
 <div id="boot"><div class="s" id="boots">0</div></div>
@@ -105,7 +126,7 @@ const TILE = META.tile, GOLD = META.gold;
 
 let view = 'map';
 let focal = 1400, dist = META.views.map.dist;
-let camX = -300 * dist / focal, camY = 0;
+let camX = 0, camY = 0;
 let drag = false, lx = 0, ly = 0, moved = false;
 let hot = -1, pinned = -1, hotLine = -1;
 let pos = DATA.map(d => d[view].slice());
@@ -123,19 +144,28 @@ const hasMeaning = (i, m) => DATA[i].means.includes(m);
 const nodes = DATA.map((d, i) => {
   const el = document.createElement('div');
   el.className = 'node';
-  el.innerHTML = `<img src="${THUMB(d.thumb)}" alt="">` +
-                 `<div class="wash" style="background:${META.mcol[d.means[0]]}"></div>`;
-  el.querySelector('img').addEventListener('mouseenter', () => { hot = i; paint(); });
-  el.querySelector('img').addEventListener('mouseleave', () => { hot = -1; paint(); });
-  el.querySelector('img').addEventListener('click', e => {
+  el.innerHTML =
+    `<div class="card">
+       <div class="face front"><img src="${THUMB(d.thumb)}" alt="">
+         <div class="wash" style="background:${META.mcol[d.means[0]]}"></div></div>
+       <div class="face back"></div>
+     </div>`;
+  el.querySelector('.front').addEventListener('mouseenter', () => { hot = i; paint(); });
+  el.querySelector('.front').addEventListener('mouseleave', () => { hot = -1; paint(); });
+  el.querySelector('.front').addEventListener('click', e => {
     e.stopPropagation();
     if (moved) return;
     pinned = pinned === i ? -1 : i;
     paint();
   });
+  el.querySelector('.back').addEventListener('click', e => {
+    e.stopPropagation();
+    if (!moved){ pinned = -1; onUnpin(); paint(); }
+  });
   world.appendChild(el);
   return el;
 });
+function onUnpin(){}                       /* draft 17 replaces this */
 addEventListener('click', () => { if (!moved && hotLine < 0 && pinned >= 0) { pinned = -1; paint(); } });
 
 /* each place is a horizontal band in Map view — label it at the left edge */
@@ -208,6 +238,9 @@ function paint(){
     el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
     el.style.width = w + 'px'; el.style.height = h + 'px';
     el.classList.toggle('held', held);
+    const flip = held && hot === i;
+    el.classList.toggle('flip', flip);
+    if (flip) fillBack(el, i, ln);
     el.style.opacity = !live(i) ? .10
       : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .24);
     el.style.zIndex = 1000 - Math.round(p.d / 4);
@@ -272,8 +305,25 @@ function paint(){
   });
 }
 
+function fillBack(el, i, ln){
+  const d = DATA[i], by = {};
+  ln.forEach(([, ma, mb]) => { by[mb] = (by[mb] || 0) + 1; });
+  const seen = d.freq < .3 ? 'every day' : d.freq < .55 ? 'now and then' : 'rarely';
+  el.querySelector('.back').innerHTML =
+    `<div class="t">${d.title}</div>
+     <div class="r"><span>Does</span><b>${d.means.map(m =>
+        `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
+     <div class="r"><span>Found in</span><b>${d.place}</b></div>
+     <div class="r"><span>Seen</span><b>${seen}</b></div>
+     <div class="r"><span>Joined to</span><b>${ln.length} pictures</b></div>
+     <div class="k">${META.meanings.filter(m => by[m]).map(m =>
+        `<span style="color:${META.mcol[m]}">${by[m]} ${m}</span>`).join(' · ')}</div>`;
+}
+
 function showCard(i, k, ln){
-  const d = DATA[i], el = document.getElementById('card');
+  const el = document.getElementById('card');
+  if (i === pinned && hot === i){ el.style.display = 'none'; return; }
+  const d = DATA[i];
   const by = {}; ln.forEach(([, ma, mb]) => { by[mb] = (by[mb] || 0) + 1; });
   const seen = d.freq < .3 ? 'every day' : d.freq < .55 ? 'now and then' : 'rarely';
   el.style.display = 'block';
@@ -329,7 +379,7 @@ function flyTo(j){
 /* ---------- views ---------- */
 let anim = null;
 function goto(v){
-  view = v; dist = META.views[v].dist; camX = -300 * dist / focal; camY = 0;
+  view = v; dist = META.views[v].dist; camX = 0; camY = 0;
   const from = pos.map(p => p.slice()), to = DATA.map(d => d[v]);
   const t0 = performance.now(), T = 950;
   cancelAnimationFrame(anim);
@@ -343,19 +393,26 @@ function goto(v){
   })(t0);
   setTimeout(() => { pos = DATA.map(d => d[v].slice()); paint(); }, T + 60);
 }
+const ICON = {
+  map:    '<circle cx="5" cy="6" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="9" cy="11" r="1.6"/><circle cx="16" cy="13" r="1.6"/><circle cx="4" cy="15" r="1.6"/>',
+  places: '<path d="M10 17s6-5.1 6-9.4A6 6 0 0 0 4 7.6C4 11.9 10 17 10 17z"/><circle cx="10" cy="7.4" r="2.1"/>',
+  web:    '<circle cx="10" cy="10" r="2"/><circle cx="4" cy="4.5" r="1.5"/><circle cx="16" cy="5" r="1.5"/><circle cx="4.5" cy="16" r="1.5"/><circle cx="16" cy="15.5" r="1.5"/><path d="M8.6 8.6 5.1 5.6M11.5 8.7 14.7 6M8.7 11.5 5.7 14.7M11.5 11.4 14.7 14.3"/>',
+  grid:   '<rect x="3" y="3" width="5.5" height="5.5"/><rect x="11.5" y="3" width="5.5" height="5.5"/><rect x="3" y="11.5" width="5.5" height="5.5"/><rect x="11.5" y="11.5" width="5.5" height="5.5"/>'
+};
 document.getElementById('tabs').innerHTML = META.viewOrder.map(v =>
-  `<button data-v="${v}" class="${v === view ? 'on' : ''}">${META.views[v].label}</button>`).join('');
+  `<button data-v="${v}" class="${v === view ? 'on' : ''}" title="${META.views[v].label}">
+     <svg viewBox="0 0 20 20">${ICON[v]}</svg><i>${META.views[v].label}</i></button>`).join('');
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(o => o.classList.toggle('on', o === b));
   goto(b.dataset.v);
 });
 
 document.getElementById('klist').innerHTML = META.families.map(f =>
-  `<div class="fam">${META.famLabel[f]}</div>` +
+  `<div class="col"><div class="fam">${META.famLabel[f]}</div>` +
   META.meanings.filter(m => META.fam[m] === f).map(m =>
     `<div class="m" data-m="${m}"><i style="background:${META.mcol[m]}"></i>
        <u>${m}</u><s>${DATA.filter(d => d.means.includes(m)).length}</s></div>`).join('')
-).join('') + `<div class="m all" data-m="">show everything</div>`;
+  + `</div>`).join('');
 document.querySelectorAll('.m').forEach(el => el.onclick = () => {
   const m = el.dataset.m || null;
   only = (only === m) ? null : m;

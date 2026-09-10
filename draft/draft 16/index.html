@@ -43,7 +43,9 @@
   .m u{text-decoration:none;flex:1}
   .m s{text-decoration:none;font-size:11px;opacity:.5;font-variant-numeric:tabular-nums}
   .m:hover,.m.on{color:var(--fg)} .m.on i,.m:hover i{opacity:1}
-  .m.dim{opacity:.32}
+  .m.dim{opacity:.28}
+  .m.all{margin-top:8px;padding-top:9px;border-top:1px solid rgba(255,255,255,.12);font-size:12px}
+  .m.all i{display:none}
 
   #card{position:fixed;right:30px;top:50%;transform:translateY(-50%);z-index:40;width:250px;
         display:none;background:rgba(27,27,27,.84);backdrop-filter:blur(12px);
@@ -76,7 +78,7 @@
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
-<script src="../assets/kin150.js?b=4"></script>
+<script src="../assets/kin16.js?b=2"></script>
 <script>
 /* ------------------------------------------------------------------
    Where a picture sits is where the grid was found.
@@ -92,11 +94,14 @@ const TILE = META.tile, GOLD = META.gold;
 let view = 'map';
 let camX = 0, camY = 0, dist = META.views.map.dist, focal = 1400;
 let drag = false, lx = 0, ly = 0, moved = false;
-let hot = -1, pinned = -1, hotLine = -1, muted = new Set();
+let hot = -1, pinned = -1, hotLine = -1;
 let pos = DATA.map(d => d[view].slice());
 let P = [], segs = [];
 
-const kinOf = i => META.groups[DATA[i].meaning].filter(j => j !== i);
+const linksOf = i => (META.links[String(i)] || [])
+  .filter(([, m]) => !only || m === only);
+const hasMeaning = (i, m) => DATA[i].means.includes(m);
+let only = null;                       /* a meaning clicked in the key */
 
 /* ---------- pictures ---------- */
 const nodes = DATA.map((d, i) => {
@@ -116,12 +121,25 @@ const nodes = DATA.map((d, i) => {
 });
 addEventListener('click', () => { if (!moved && hotLine < 0 && pinned >= 0) { pinned = -1; paint(); } });
 
+/* each place is a horizontal band in Map view — label it at the left edge */
+const minX = Math.min(...DATA.map(d => d.map[0]));
 const places = META.places.map(p => {
+  const ys = DATA.filter(d => d.place === p).map(d => d.map[1]);
   const el = document.createElement('div');
   el.className = 'place'; el.textContent = p;
   world.appendChild(el);
-  return { p, el, at: META.placeAt[p] };
+  return { p, el, at: [minX - 620, ys.reduce((a, b) => a + b, 0) / ys.length] };
 });
+
+/* the horizontal axis, said once, out in the space */
+const ends = [['seen every day', minX - 240], ['seen rarely', Math.max(...DATA.map(d => d.map[0])) + 240]]
+  .map(([t, x]) => {
+    const el = document.createElement('div');
+    el.className = 'place'; el.textContent = t;
+    el.style.color = '#a5a29c';
+    world.appendChild(el);
+    return { el, x };
+  });
 
 function project(x, y, z){
   const d = z + dist;
@@ -142,34 +160,46 @@ function paint(){
 
   P = pos.map(p => project(p[0], p[1], p[2]));
   const focusI = pinned >= 0 ? pinned : hot;
-  const kin = focusI >= 0 ? new Set(kinOf(focusI)) : null;
-  const live = i => !muted.has(DATA[i].meaning);
+  const ln = focusI >= 0 ? linksOf(focusI) : [];
+  const kin = new Set(ln.map(([j]) => j));
+  const live = i => !only || hasMeaning(i, only);
 
   /* pictures */
   DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
-    const p = P[i], el = nodes[i], big = i === focusI ? 1.42 : 1;
+    /* a picture in hand grows with how much it is tied to */
+    const p = P[i], el = nodes[i];
+    const big = i === focusI ? 1.25 + 0.75 * (DATA[i].deg / META.maxdeg) : 1;
     const w = TILE * p.s * big, h = w * .8;
     el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
     el.style.width = w + 'px'; el.style.height = h + 'px';
-    el.style.opacity = !live(i) ? .12
-      : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .26);
+    el.style.opacity = !live(i) ? .10
+      : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .24);
     el.style.zIndex = 1000 - Math.round(p.d / 4);
     el.classList.toggle('front', i === focusI);
   });
 
-  /* lines only for the picture in hand — everything else stays quiet */
+  /* the resting web — quiet, but the field is never empty */
+  ctx.lineWidth = 1;
+  META.web.forEach(([a, b, m]) => {
+    if (only && m !== only) return;
+    const pa = P[a], pb = P[b];
+    if (!pa || !pb) return;
+    ctx.strokeStyle = rgba(META.mcol[m], focusI < 0 ? .17 : .05);
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+  });
+
+  /* every line the picture in hand actually has — one per shared meaning */
   segs = [];
   if (focusI >= 0 && live(focusI)){
-    const col = META.mcol[DATA[focusI].meaning];
     const p0 = P[focusI];
-    kinOf(focusI).forEach(j => {
+    ln.forEach(([j, m]) => {
       if (!P[j] || !live(j)) return;
-      segs.push({ a: p0, b: P[j], j });
+      segs.push({ a: p0, b: P[j], j, m });
     });
     segs.forEach((s, k) => {
       const on = k === hotLine;
-      ctx.strokeStyle = on ? GOLD : rgba(col, .8);
-      ctx.lineWidth = on ? 2.4 : 1.2;
+      ctx.strokeStyle = on ? GOLD : rgba(META.mcol[s.m], .72);
+      ctx.lineWidth = on ? 2.4 : 1.1;
       ctx.beginPath(); ctx.moveTo(s.a.x, s.a.y); ctx.lineTo(s.b.x, s.b.y); ctx.stroke();
     });
     if (hotLine >= 0 && segs[hotLine]){
@@ -178,31 +208,43 @@ function paint(){
       ctx.strokeRect(t.x - TILE * t.s / 2 - 4, t.y - TILE * t.s * .4 - 4,
                      TILE * t.s + 8, TILE * t.s * .8 + 8);
     }
-    showCard(focusI, kin.size);
+    showCard(focusI, kin.size, ln);
   } else {
     document.getElementById('card').style.display = 'none';
   }
 
   places.forEach(o => {
-    const p = project(o.at[0], o.at[1] - (META.labelLift[o.p] || 520), 0);
+    const p = project(o.at[0], o.at[1], 0);
     if (!p || view !== 'map') { o.el.style.opacity = 0; return; }
     o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
     o.el.style.opacity = focusI < 0 ? .85 : .3;
     o.el.style.fontSize = Math.max(9, Math.min(15, 11 * p.s * 1.4)) + 'px';
   });
+  ends.forEach(o => {
+    const q = project(o.x, 0, 0);
+    if (!q || view !== 'map') { o.el.style.opacity = 0; return; }
+    o.el.style.transform = `translate(${q.x}px,${q.y}px) translate(-50%,-50%)`;
+    o.el.style.opacity = focusI < 0 ? .8 : .25;
+    o.el.style.fontSize = Math.max(10, Math.min(16, 12 * q.s * 1.4)) + 'px';
+  });
 }
 
-function showCard(i, k){
+function showCard(i, k, ln){
   const d = DATA[i], el = document.getElementById('card');
+  const by = {}; ln.forEach(([, m]) => by[m] = (by[m] || 0) + 1);
+  const seen = d.freq < .3 ? 'every day' : d.freq < .55 ? 'now and then' : 'rarely';
   el.style.display = 'block';
   el.innerHTML =
     `<div class="t">${d.title}</div>
-     <div class="r"><span>Does</span><b style="color:${META.mcol[d.meaning]}">${d.meaning}</b></div>
+     <div class="r"><span>Does</span><b>${d.means.map(m =>
+        `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
      <div class="r"><span>Found in</span><b>${d.place}</b></div>
-     <div class="r"><span>Grid of</span><b>${d.v} × ${d.h}</b></div>
-     <div class="r"><span>Same doing</span><b>${k} others</b></div>
-     ${pinned === i ? '<div class="hint">Follow a line to jump to the other picture.</div>'
-                    : '<div class="hint">Click to hold it in front.</div>'}`;
+     <div class="r"><span>Seen</span><b>${seen}</b></div>
+     <div class="r"><span>Grid of</span><b>${d.v && d.h ? d.v + ' × ' + d.h : 'no visible divisions'}</b></div>
+     <div class="r"><span>Joined to</span><b>${k} pictures</b></div>
+     <div class="hint">${META.meanings.filter(m => by[m]).map(m =>
+        `<span style="color:${META.mcol[m]}">${by[m]} ${m}</span>`).join(' · ')}
+      <br>${pinned === i ? 'Follow a line to jump across.' : 'Click to hold it in front.'}</div>`;
 }
 
 /* ---------- following a line ---------- */
@@ -269,11 +311,13 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 
 document.getElementById('klist').innerHTML = META.meanings.map(m =>
   `<div class="m" data-m="${m}"><i style="background:${META.mcol[m]}"></i>
-     <u>${m}</u><s>${META.mcount[m]}</s></div>`).join('');
+     <u>${m}</u><s>${META.mcount[m]}</s></div>`).join('')
+  + `<div class="m all" data-m="">show everything</div>`;
 document.querySelectorAll('.m').forEach(el => el.onclick = () => {
-  const m = el.dataset.m;
-  muted.has(m) ? muted.delete(m) : muted.add(m);
-  el.classList.toggle('dim', muted.has(m));
+  const m = el.dataset.m || null;
+  only = (only === m) ? null : m;
+  document.querySelectorAll('.m').forEach(o =>
+    o.classList.toggle('dim', !!only && o.dataset.m !== only && o.dataset.m !== ''));
   paint();
 });
 document.getElementById('sub').textContent = META.views.map.sub;

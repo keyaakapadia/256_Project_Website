@@ -19,9 +19,9 @@
   #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
   #world{position:fixed;inset:0}
   .node{position:absolute;will-change:transform}
-  .node{perspective:1400px}
-  .card{position:absolute;inset:0;transform-style:preserve-3d;
-        transition:transform .55s cubic-bezier(.3,.8,.3,1)}
+  .node{perspective:1600px}
+  .card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;
+        transition:transform .62s cubic-bezier(.22,.75,.28,1)}
   .node.flip .card{transform:rotateY(180deg)}
   .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
   .back{transform:rotateY(180deg);background:#efece2;color:#17150f;
@@ -51,8 +51,13 @@
        border-radius:2px;border-left:2px solid rgba(255,255,255,.16)}
   #klist{display:grid;grid-template-columns:repeat(3,minmax(96px,1fr));gap:0 20px}
   .col{display:flex;flex-direction:column}
-  .box h4{margin:0 0 11px;font-size:10px;letter-spacing:.19em;text-transform:uppercase;
-          color:var(--soft);font-weight:400}
+  .box h4{margin:0;font-size:10px;letter-spacing:.19em;text-transform:uppercase;
+          color:var(--soft);font-weight:400;cursor:pointer;user-select:none;
+          display:flex;justify-content:space-between;gap:22px;align-items:center}
+  .box h4:hover{color:var(--fg)}
+  .box h4 b{font-weight:400;font-size:13px;line-height:1}
+  #keybody{margin-top:11px;overflow:hidden;transition:.28s ease}
+  #key.shut #keybody{margin-top:0;height:0;opacity:0}
   nav{position:fixed;right:30px;top:28px;z-index:40;display:flex;gap:6px;
       background:rgba(24,24,24,.80);backdrop-filter:blur(14px);padding:6px;border-radius:2px}
   nav button{background:none;border:0;width:38px;height:38px;cursor:pointer;padding:0;
@@ -76,18 +81,10 @@
   .m:hover,.m.on{color:var(--fg)} .m.on i,.m:hover i{opacity:1}
   .m.dim{opacity:.28}
   .fam{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5f5c58;
-       margin:0 0 6px;line-height:1.35;min-height:26px}
+       margin:0 0 6px}
   .m.all{margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);font-size:12px}
   .m.all i{display:none}
 
-  #card{position:fixed;right:30px;top:50%;transform:translateY(-50%);z-index:40;width:250px;
-        display:none;background:rgba(27,27,27,.84);backdrop-filter:blur(12px);
-        padding:16px 18px;border-radius:10px}
-  #card .t{font-size:15px;font-weight:500;line-height:1.3;margin-bottom:12px}
-  #card .r{display:flex;gap:14px;padding:4px 0;font-size:13px}
-  #card .r span{color:var(--soft);width:78px;flex:none}
-  #card .r b{font-weight:400;flex:1}
-  #card .hint{margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.13);
               font-size:11px;color:var(--soft);line-height:1.6}
 
 
@@ -104,10 +101,10 @@
 <canvas id="wire"></canvas>
 
 <nav id="tabs"></nav>
-<div id="rail"><div class="box" id="key"><h4>What the grid does</h4>
-  <div id="klist"></div>
-  <div class="m all" data-m="">show everything</div></div></div>
-<div id="card"></div>
+<div id="rail"><div class="box" id="key">
+  <h4 id="keyhead">What the grid does<b>–</b></h4>
+  <div id="keybody"><div id="klist"></div>
+  <div class="m all" data-m="">show everything</div></div></div></div>
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
@@ -162,6 +159,7 @@ const nodes = DATA.map((d, i) => {
     e.stopPropagation();
     if (!moved){ pinned = -1; onUnpin(); paint(); }
   });
+  el.__i = i;
   world.appendChild(el);
   return el;
 });
@@ -214,6 +212,12 @@ function stroke(pa, pb, ma, mb, alpha){
   return g;
 }
 
+const last = new Map();
+function put(el, k, v){                    /* only touch the DOM when it changes */
+  const key = el.__i + k;
+  if (last.get(key) === v) return;
+  last.set(key, v); el.style[k] = v;
+}
 function paint(){
   const dpr = Math.min(2, devicePixelRatio || 1);
   if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
@@ -235,15 +239,15 @@ function paint(){
     const big = i === focusI ? 1.25 + 0.75 * (DATA[i].deg / META.maxdeg) : 1;
     let w = TILE * p.s * big, h = w * .8;
     if (held){ h = Math.min(innerHeight * .52, 520); w = h / .8; }
-    el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
-    el.style.width = w + 'px'; el.style.height = h + 'px';
+    put(el, 'transform', `translate(${Math.round(p.x - w / 2)}px,${Math.round(p.y - h / 2)}px)`);
+    put(el, 'width', Math.round(w) + 'px'); put(el, 'height', Math.round(h) + 'px');
     el.classList.toggle('held', held);
     const flip = held && hot === i;
     el.classList.toggle('flip', flip);
     if (flip) fillBack(el, i, ln);
-    el.style.opacity = !live(i) ? .10
-      : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .24);
-    el.style.zIndex = 1000 - Math.round(p.d / 4);
+    put(el, 'opacity', String(!live(i) ? .10
+      : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .24)));
+    put(el, 'zIndex', String(1000 - Math.round(p.d / 4)));
     el.classList.toggle('front', i === focusI);
   });
 
@@ -277,9 +281,6 @@ function paint(){
       ctx.strokeRect(t.x - TILE * t.s / 2 - 4, t.y - TILE * t.s * .4 - 4,
                      TILE * t.s + 8, TILE * t.s * .8 + 8);
     }
-    showCard(focusI, kin.size, ln);
-  } else {
-    document.getElementById('card').style.display = 'none';
   }
 
   places.forEach(o => {
@@ -318,25 +319,6 @@ function fillBack(el, i, ln){
      <div class="r"><span>Joined to</span><b>${ln.length} pictures</b></div>
      <div class="k">${META.meanings.filter(m => by[m]).map(m =>
         `<span style="color:${META.mcol[m]}">${by[m]} ${m}</span>`).join(' · ')}</div>`;
-}
-
-function showCard(i, k, ln){
-  const el = document.getElementById('card');
-  if (i === pinned && hot === i){ el.style.display = 'none'; return; }
-  const d = DATA[i];
-  const by = {}; ln.forEach(([, ma, mb]) => { by[mb] = (by[mb] || 0) + 1; });
-  const seen = d.freq < .3 ? 'every day' : d.freq < .55 ? 'now and then' : 'rarely';
-  el.style.display = 'block';
-  el.innerHTML =
-    `<div class="t">${d.title}</div>
-     <div class="r"><span>Does</span><b>${d.means.map(m =>
-        `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
-     <div class="r"><span>Found in</span><b>${d.place}</b></div>
-     <div class="r"><span>Seen</span><b>${seen}</b></div>
-     <div class="r"><span>Joined to</span><b>${k} pictures</b></div>
-     <div class="hint">${META.meanings.filter(m => by[m]).map(m =>
-        `<span style="color:${META.mcol[m]}">${by[m]} ${m}</span>`).join(' · ')}
-      <br>${pinned === i ? 'Follow a line to jump across.' : 'Click to hold it in front.'}</div>`;
 }
 
 /* ---------- following a line ---------- */
@@ -407,12 +389,18 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   goto(b.dataset.v);
 });
 
+const SHORT = { inform: 'locating', hold: 'dividing', make: 'filling' };
 document.getElementById('klist').innerHTML = META.families.map(f =>
-  `<div class="col"><div class="fam">${META.famLabel[f]}</div>` +
+  `<div class="col"><div class="fam">${SHORT[f]}</div>` +
   META.meanings.filter(m => META.fam[m] === f).map(m =>
     `<div class="m" data-m="${m}"><i style="background:${META.mcol[m]}"></i>
        <u>${m}</u><s>${DATA.filter(d => d.means.includes(m)).length}</s></div>`).join('')
   + `</div>`).join('');
+document.getElementById('keyhead').onclick = () => {
+  const k = document.getElementById('key');
+  k.classList.toggle('shut');
+  k.querySelector('h4 b').textContent = k.classList.contains('shut') ? '+' : '–';
+};
 document.querySelectorAll('.m').forEach(el => el.onclick = () => {
   const m = el.dataset.m || null;
   only = (only === m) ? null : m;

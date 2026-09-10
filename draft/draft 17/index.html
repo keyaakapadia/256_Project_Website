@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kin</title>
+<title>Kin — focus</title>
 <style>
   :root{
     --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85; --gold:#ffc23d;
@@ -109,6 +109,41 @@ let camX = -300 * dist / focal, camY = 0;
 let drag = false, lx = 0, ly = 0, moved = false;
 let hot = -1, pinned = -1, hotLine = -1;
 let pos = DATA.map(d => d[view].slice());
+let focusPos = null;          /* where everything goes while one picture is held */
+
+function buildFocus(i){
+  const ln = linksOf(i);
+  const base = DATA.map(d => d[view].slice());
+  const out = base.map(p => p.slice());
+  out[i] = [0, 0, 0];
+  const R0 = 1250, RING = 560;
+  ln.forEach(([j], k) => {
+    const ring = Math.floor(k / 12), inRing = k % 12, per = Math.min(12, ln.length - ring * 12);
+    const a = (inRing / per) * Math.PI * 2 - Math.PI / 2 + ring * 0.26;
+    const r = R0 + ring * RING;
+    out[j] = [Math.cos(a) * r * 1.5, Math.sin(a) * r, 0];
+  });
+  const kin = new Set(ln.map(([j]) => j));
+  base.forEach((p, j) => {                       /* everything else drifts to the rim */
+    if (j === i || kin.has(j)) return;
+    const d = Math.hypot(p[0], p[1]) || 1;
+    out[j] = [p[0] / d * 4200, p[1] / d * 4200, p[2]];
+  });
+  return out;
+}
+function easeTo(target, T = 700){
+  const from = pos.map(p => p.slice()), t0 = performance.now();
+  cancelAnimationFrame(anim);
+  (function step(now){
+    const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
+    pos = from.map((p, i) => [p[0] + (target[i][0] - p[0]) * e,
+                              p[1] + (target[i][1] - p[1]) * e,
+                              p[2] + (target[i][2] - p[2]) * e]);
+    paint();
+    if (u < 1) anim = requestAnimationFrame(step);
+  })(t0);
+  setTimeout(() => { pos = target.map(p => p.slice()); paint(); }, T + 60);
+}
 let P = [], segs = [];
 
 let only = null;                       /* a meaning clicked in the key */
@@ -131,12 +166,18 @@ const nodes = DATA.map((d, i) => {
     e.stopPropagation();
     if (moved) return;
     pinned = pinned === i ? -1 : i;
+    if (pinned >= 0){ camX = camY = 0; focusPos = buildFocus(pinned); easeTo(focusPos); }
+    else { focusPos = null; easeTo(DATA.map(d => d[view].slice())); }
     paint();
   });
   world.appendChild(el);
   return el;
 });
-addEventListener('click', () => { if (!moved && hotLine < 0 && pinned >= 0) { pinned = -1; paint(); } });
+addEventListener('click', () => {
+  if (!moved && hotLine < 0 && pinned >= 0){
+    pinned = -1; focusPos = null; easeTo(DATA.map(d => d[view].slice())); paint();
+  }
+});
 
 /* each place is a horizontal band in Map view — label it at the left edge */
 const minX = Math.min(...DATA.map(d => d.places[0]));
@@ -234,9 +275,16 @@ function paint(){
     });
     segs.forEach((sg, k) => {
       const on = k === hotLine;
-      ctx.strokeStyle = on ? GOLD : stroke(sg.a, sg.b, sg.ma, sg.mb, .85);
-      ctx.lineWidth = on ? 3.2 : 1.9;
-      ctx.beginPath(); ctx.moveTo(sg.a.x, sg.a.y); ctx.lineTo(sg.b.x, sg.b.y); ctx.stroke();
+      ctx.strokeStyle = on ? GOLD : stroke(sg.a, sg.b, sg.ma, sg.mb, .9);
+      ctx.lineWidth = on ? 3.4 : 2;
+      ctx.beginPath(); ctx.moveTo(sg.a.x, sg.a.y);
+      if (pinned >= 0){                       /* fan them, so the bundle reads as a spray */
+        const mx = (sg.a.x + sg.b.x) / 2, my = (sg.a.y + sg.b.y) / 2;
+        const dx = sg.b.x - sg.a.x, dy = sg.b.y - sg.a.y, L = Math.hypot(dx, dy) || 1;
+        const bow = Math.min(120, L * 0.17) * (k % 2 ? 1 : -1);
+        ctx.quadraticCurveTo(mx - dy / L * bow, my + dx / L * bow, sg.b.x, sg.b.y);
+      } else ctx.lineTo(sg.b.x, sg.b.y);
+      ctx.stroke();
     });
     if (hotLine >= 0 && segs[hotLine]){
       const t = segs[hotLine].b;
@@ -297,8 +345,11 @@ function nearestSeg(mx, my){
     const dx = s.b.x - s.a.x, dy = s.b.y - s.a.y;
     const L = dx * dx + dy * dy; if (!L) return;
     let t = ((mx - s.a.x) * dx + (my - s.a.y) * dy) / L;
-    t = Math.max(.08, Math.min(1, t));            /* ignore the stub under the picture */
-    const px = s.a.x + dx * t, py = s.a.y + dy * t;
+    t = Math.max(.14, Math.min(1, t));            /* ignore the stub under the picture */
+    const bow = pinned >= 0 ? Math.min(120, Math.sqrt(L) * 0.17 * Math.sqrt(L)) * (k % 2 ? 1 : -1) : 0;
+    const len = Math.sqrt(L) || 1;
+    const px = s.a.x + dx * t - (dy / len) * bow * 2 * t * (1 - t);
+    const py = s.a.y + dy * t + (dx / len) * bow * 2 * t * (1 - t);
     const d = Math.hypot(mx - px, my - py);
     if (d < bd) { bd = d; best = k; }
   });
@@ -313,7 +364,7 @@ addEventListener('click', e => {
   if (moved || hotLine < 0 || !segs[hotLine]) return;
   const j = segs[hotLine].j;
   hotLine = -1; document.body.classList.remove('overline');
-  flyTo(j);
+  pinned = j; camX = camY = 0; focusPos = buildFocus(j); easeTo(focusPos); paint();
 });
 function flyTo(j){
   pinned = j;                                   /* select first — the camera only catches up */
@@ -331,6 +382,7 @@ function flyTo(j){
 let anim = null;
 function goto(v){
   view = v; dist = META.views[v].dist; camX = -300 * dist / focal; camY = 0;
+  pinned = -1; focusPos = null;
   const from = pos.map(p => p.slice()), to = DATA.map(d => d[v]);
   const t0 = performance.now(), T = 950;
   cancelAnimationFrame(anim);

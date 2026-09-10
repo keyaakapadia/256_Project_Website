@@ -90,7 +90,7 @@
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
-<script src="../assets/kin16.js?b=5"></script>
+<script src="../assets/kin16.js?b=7"></script>
 <script>
 /* ------------------------------------------------------------------
    Where a picture sits is where the grid was found.
@@ -116,12 +116,12 @@ function buildFocus(i){
   const base = DATA.map(d => d[view].slice());
   const out = base.map(p => p.slice());
   out[i] = [0, 0, 0];
-  const R0 = 1250, RING = 560;
+  const R0 = 1020, RING = 470;
   ln.forEach(([j], k) => {
     const ring = Math.floor(k / 12), inRing = k % 12, per = Math.min(12, ln.length - ring * 12);
     const a = (inRing / per) * Math.PI * 2 - Math.PI / 2 + ring * 0.26;
     const r = R0 + ring * RING;
-    out[j] = [Math.cos(a) * r * 1.5, Math.sin(a) * r, 0];
+    out[j] = [Math.cos(a) * r * 1.45, Math.sin(a) * r, 0];
   });
   const kin = new Set(ln.map(([j]) => j));
   base.forEach((p, j) => {                       /* everything else drifts to the rim */
@@ -199,7 +199,7 @@ const heads = META.meanings.map(m => {
 });
 
 /* the horizontal axis, said once, out in the space */
-const ends = [['seen every day', minX - 240], ['seen rarely', Math.max(...DATA.map(d => d.places[0])) + 240]]
+const ends = [['seen every day', META.freqX[0]], ['seen rarely', META.freqX[1]]]
   .map(([t, x]) => {
     const el = document.createElement('div');
     el.className = 'place'; el.textContent = t;
@@ -245,13 +245,17 @@ function paint(){
     const held = i === pinned;
     const big = i === focusI ? 1.25 + 0.75 * (DATA[i].deg / META.maxdeg) : 1;
     let w = TILE * p.s * big, h = w * .8;
-    if (held){ h = Math.min(innerHeight * .52, 520); w = h / .8; }
+    if (held){ h = Math.min(innerHeight * .30, 330); w = h / .8; }
+    else if (pinned >= 0 && kin.has(i)){         /* ringed kin come forward too */
+      const floor = Math.min(innerHeight * .15, 150);
+      if (h < floor){ h = floor; w = h / .8; }
+    }
     el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
     el.style.width = w + 'px'; el.style.height = h + 'px';
     el.classList.toggle('held', held);
     el.style.opacity = !live(i) ? .10
       : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .95 : .24);
-    el.style.zIndex = 1000 - Math.round(p.d / 4);
+    el.style.zIndex = (pinned >= 0 && kin.has(i) ? 4000 : 0) + 1000 - Math.round(p.d / 4);
     el.classList.toggle('front', i === focusI);
   });
 
@@ -312,7 +316,7 @@ function paint(){
     o.el.style.fontSize = Math.max(9, Math.min(15, 11 * q.s * 1.5)) + 'px';
   });
   ends.forEach(o => {
-    const q = project(o.x, 0, 0);
+    const q = project(o.x, META.axisY, 0);
     if (!q || view !== 'places') { o.el.style.opacity = 0; return; }
     o.el.style.transform = `translate(${q.x}px,${q.y}px) translate(-50%,-50%)`;
     o.el.style.opacity = focusI < 0 ? .8 : .25;

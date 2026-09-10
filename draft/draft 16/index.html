@@ -90,7 +90,7 @@
 
 <div id="boot"><div class="s" id="boots">0</div></div>
 
-<script src="../assets/kin16.js?b=5"></script>
+<script src="../assets/kin16.js?b=7"></script>
 <script>
 /* ------------------------------------------------------------------
    Where a picture sits is where the grid was found.
@@ -158,7 +158,7 @@ const heads = META.meanings.map(m => {
 });
 
 /* the horizontal axis, said once, out in the space */
-const ends = [['seen every day', minX - 240], ['seen rarely', Math.max(...DATA.map(d => d.places[0])) + 240]]
+const ends = [['seen every day', META.freqX[0]], ['seen rarely', META.freqX[1]]]
   .map(([t, x]) => {
     const el = document.createElement('div');
     el.className = 'place'; el.textContent = t;
@@ -264,7 +264,7 @@ function paint(){
     o.el.style.fontSize = Math.max(9, Math.min(15, 11 * q.s * 1.5)) + 'px';
   });
   ends.forEach(o => {
-    const q = project(o.x, 0, 0);
+    const q = project(o.x, META.axisY, 0);
     if (!q || view !== 'places') { o.el.style.opacity = 0; return; }
     o.el.style.transform = `translate(${q.x}px,${q.y}px) translate(-50%,-50%)`;
     o.el.style.opacity = focusI < 0 ? .8 : .25;

@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kin</title>
+<style>
+  :root{
+    --bg:#1c1c1c; --fg:#f4f3f0; --soft:#8d8a85;
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:13px;
+       overflow:hidden;-webkit-font-smoothing:antialiased;cursor:grab}
+  body.drag{cursor:grabbing}
+
+  #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #world{position:fixed;inset:0}
+  .node{position:absolute;will-change:transform;cursor:pointer}
+  .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626}
+  .node .wash{position:absolute;inset:0;mix-blend-mode:screen;opacity:0;transition:opacity .25s}
+  .node.kin .wash{opacity:.42}
+  .node.on{z-index:9999!important}
+
+  /* ---------- tabs ---------- */
+  nav{position:fixed;left:50%;top:22px;transform:translateX(-50%);z-index:40;display:flex;gap:4px;
+      background:rgba(28,28,28,.82);backdrop-filter:blur(12px);padding:4px;border-radius:24px}
+  nav button{background:none;border:0;color:var(--soft);font:inherit;font-size:14px;
+             padding:7px 17px;border-radius:20px;cursor:pointer;letter-spacing:.01em}
+  nav button:hover{color:var(--fg)}
+  nav button.on{color:var(--fg);background:rgba(255,255,255,.10)}
+
+  #by{position:fixed;left:34px;top:50%;transform:translateY(-50%);z-index:40;
+      background:rgba(28,28,28,.82);backdrop-filter:blur(12px);padding:16px 20px 14px;border-radius:10px}
+  #by h4{margin:0 0 12px;font-size:13px;color:var(--soft);font-weight:400}
+  .b{display:flex;align-items:center;gap:11px;padding:5px 0;cursor:pointer;user-select:none;
+     color:var(--soft);font-size:14px}
+  .b i{width:10px;height:10px;border-radius:50%;flex:none;opacity:.5}
+  .b:hover{color:var(--fg)}
+  .b.on{color:var(--fg)} .b.on i{opacity:1}
+
+  #meta{position:fixed;right:34px;top:50%;transform:translateY(-50%);z-index:40;
+        width:262px;display:none;background:rgba(28,28,28,.82);backdrop-filter:blur(12px);
+        padding:16px 20px;border-radius:10px}
+  #meta .r{display:flex;gap:18px;padding:3px 0;font-size:14px}
+  #meta .r span{color:var(--soft);width:74px;flex:none}
+  #meta .r b{font-weight:400;flex:1}
+
+  #sub{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:40;
+       font-size:12px;color:var(--soft);transition:opacity .3s;
+       background:rgba(28,28,28,.82);padding:7px 14px;border-radius:16px}
+
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
+        justify-content:center;transition:opacity .7s}
+  #boot.gone{opacity:0;pointer-events:none}
+  #boot .s{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<div id="world"></div>
+<canvas id="wire"></canvas>
+
+<nav id="tabs"></nav>
+<div id="by"><h4>View by</h4><div id="blist"></div></div>
+<div id="meta"></div>
+<div id="sub"></div>
+
+<div id="boot"><div class="s" id="boots">0</div></div>
+
+<script src="../assets/views.js?b=2"></script>
+<script>
+/* ------------------------------------------------------------------
+   Two independent controls.
+
+   The tabs change WHERE the pictures sit — scattered, pinned to how
+   finely they are divided, or returned to a plain grid.
+
+   "View by" changes WHAT A LINE MEANS. Only one relationship is ever
+   drawn, so every line on screen says the same thing, in one colour.
+   Hovering a picture draws a line to everything it is kin to.
+------------------------------------------------------------------ */
+
+const world = document.getElementById('world');
+const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
+const TILE = META.tile;
+
+let view = 'map', by = 'meaning';
+let camX = 0, camY = 0, dist = META.views.map.dist, focal = 1400;
+let drag = false, lx = 0, ly = 0, moved = false, hot = -1;
+let pos = DATA.map(d => d[view].slice());          /* animated positions */
+
+/* ---------- who is kin to whom ---------- */
+const cellsOf = d => Math.log2(Math.max(1, d.cells));
+const NEARC = DATA.map((d, i) =>
+  DATA.map((o, j) => j).filter(j => j !== i)
+      .sort((a, b) => Math.abs(cellsOf(DATA[a]) - cellsOf(d)) -
+                      Math.abs(cellsOf(DATA[b]) - cellsOf(d))).slice(0, 8));
+
+function kinOf(i){
+  const d = DATA[i];
+  if (by === 'meaning')
+    return DATA.map((_, j) => j).filter(j => j !== i && DATA[j].meaning === d.meaning);
+  if (by === 'place')
+    return d.place ? DATA.map((_, j) => j).filter(j => j !== i && DATA[j].place === d.place) : [];
+  return NEARC[i];
+}
+/* a thin resting web so the field is never blank */
+const WEB = [];
+DATA.forEach((d, i) => {
+  const k = kinOf(i);
+  k.slice(0, 2).forEach(j => WEB.push([i, j]));
+});
+let web = WEB;
+const rebuildWeb = () => {
+  web = [];
+  DATA.forEach((d, i) => kinOf(i).slice(0, 2).forEach(j => web.push([i, j])));
+};
+
+/* ---------- pictures ---------- */
+const nodes = DATA.map((d, i) => {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.innerHTML = `<img src="${THUMB(d.thumb)}" alt=""><div class="wash"></div>`;
+  el.addEventListener('mouseenter', () => { hot = i; paint(); });
+  el.addEventListener('mouseleave', () => { hot = -1; paint(); });
+  el.addEventListener('click', () => { if (!moved && d.live) window.open(d.live, '_blank'); });
+  world.appendChild(el);
+  return el;
+});
+
+function project(x, y, z){
+  const d = z + dist;
+  if (d < 90) return null;
+  const s = focal / d;
+  return { x: innerWidth / 2 + (x - camX) * s, y: innerHeight / 2 + (y - camY) * s, s, d };
+}
+const refScale = () => focal / dist;
+const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`; };
+
+function paint(){
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+  const col = META.by[by].color;
+  const P = pos.map(p => project(p[0], p[1], p[2]));
+  const kin = hot >= 0 ? new Set(kinOf(hot)) : null;
+
+  DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
+    const p = P[i], el = nodes[i], grow = i === hot ? 1.28 : 1;
+    const w = TILE * p.s * grow, h = w * .8;
+    el.style.transform = `translate(${p.x - w / 2}px,${p.y - h / 2}px)`;
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.opacity = hot < 0 ? 1 : (i === hot ? 1 : kin.has(i) ? .92 : .3);
+    el.style.zIndex = 1000 - Math.round(p.d / 4);
+    el.classList.toggle('on', i === hot);
+    el.classList.toggle('kin', hot >= 0 && (i === hot || kin.has(i)));
+    el.querySelector('.wash').style.background = col;
+  });
+
+  ctx.lineWidth = 1;
+  if (hot < 0){
+    web.forEach(([a, b]) => {
+      const pa = P[a], pb = P[b]; if (!pa || !pb) return;
+      ctx.strokeStyle = rgba(col, .26);
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+    });
+  } else {
+    web.forEach(([a, b]) => {
+      const pa = P[a], pb = P[b]; if (!pa || !pb) return;
+      ctx.strokeStyle = rgba(col, .05);
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+    });
+    const p0 = P[hot];
+    ctx.strokeStyle = rgba(col, .85);
+    kin.forEach(j => {
+      const pj = P[j]; if (!p0 || !pj) return;
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(pj.x, pj.y); ctx.stroke();
+    });
+    showMeta(hot, kin.size);
+  }
+  if (hot < 0) document.getElementById('meta').style.display = 'none';
+}
+
+function showMeta(i, k){
+  const d = DATA[i], el = document.getElementById('meta');
+  el.style.display = 'block';
+  el.innerHTML =
+    `<div class="r"><span>Title</span><b>${d.title}</b></div>
+     <div class="r"><span>Doing</span><b>${d.meaning}</b></div>
+     <div class="r"><span>Place</span><b>${d.place || '—'}</b></div>
+     <div class="r"><span>Divisions</span><b>${d.v} × ${d.h}</b></div>
+     <div class="r"><span>Kin</span><b style="color:${META.by[by].color}">${k}</b></div>`;
+}
+
+/* ---------- animate between layouts ---------- */
+let anim = null;
+function goto(v){
+  view = v; dist = META.views[v].dist;
+  document.getElementById('sub').textContent = META.views[v].sub;
+  const from = pos.map(p => p.slice()), to = DATA.map(d => d[v]);
+  const t0 = performance.now(), T = 900;
+  cancelAnimationFrame(anim);
+  (function step(now){
+    const u = Math.min(1, (now - t0) / T);
+    const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    pos = from.map((p, i) => [p[0] + (to[i][0] - p[0]) * e,
+                              p[1] + (to[i][1] - p[1]) * e,
+                              p[2] + (to[i][2] - p[2]) * e]);
+    paint();
+    if (u < 1) anim = requestAnimationFrame(step);
+  })(t0);
+}
+
+document.getElementById('tabs').innerHTML = META.viewOrder.map(v =>
+  `<button data-v="${v}" class="${v === view ? 'on' : ''}">${META.views[v].label}</button>`).join('');
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(o => o.classList.toggle('on', o === b));
+  camX = camY = 0; goto(b.dataset.v);
+});
+
+document.getElementById('blist').innerHTML = META.byOrder.map(k =>
+  `<div class="b ${k === by ? 'on' : ''}" data-b="${k}">
+     <i style="background:${META.by[k].color}"></i>${META.by[k].label}</div>`).join('');
+document.querySelectorAll('.b').forEach(el => el.onclick = () => {
+  document.querySelectorAll('.b').forEach(o => o.classList.toggle('on', o === el));
+  by = el.dataset.b; rebuildWeb(); paint();
+});
+document.getElementById('sub').textContent = META.views.map.sub;
+
+addEventListener('mousedown', e => { drag = true; moved = false; lx = e.clientX; ly = e.clientY;
+  document.body.classList.add('drag'); });
+addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - lx) + Math.abs(e.clientY - ly) > 3) moved = true;
+  const s = refScale();
+  camX -= (e.clientX - lx) / s; camY -= (e.clientY - ly) / s;
+  lx = e.clientX; ly = e.clientY; paint();
+});
+addEventListener('wheel', e => {
+  e.preventDefault();
+  dist = Math.max(600, Math.min(11000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+  paint();
+}, { passive: false });
+addEventListener('resize', paint);
+
+let loaded = 0;
+world.querySelectorAll('img').forEach(img => {
+  const tick = () => {
+    document.getElementById('boots').textContent = `${++loaded} / ${DATA.length}`;
+    if (loaded >= DATA.length) { paint();
+      setTimeout(() => document.getElementById('boot').classList.add('gone'), 240); }
+  };
+  img.complete ? tick() : (img.onload = tick, img.onerror = tick);
+});
+paint();
+</script>
+</body>
+</html>

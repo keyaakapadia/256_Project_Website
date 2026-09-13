@@ -16,7 +16,7 @@
   body.drag{cursor:grabbing}
   body.overline{cursor:pointer}
 
-  #wire{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #wire{position:fixed;inset:0;pointer-events:none;z-index:4}
   #world{position:fixed;inset:0}
   .node{position:absolute;will-change:transform;perspective:1600px}
   .card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;
@@ -29,16 +29,21 @@
   .back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
   .back .r span{color:#8b8779;width:78px;flex:none}
   .back .r b{font-weight:400;flex:1}
-  .back .k{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.16);
+    .back .k{margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.16);
            font-size:12px;line-height:1.7;color:#8b8779}
+  .pie{display:flex;align-items:center;gap:14px;margin-top:14px}
+  .donut{border-radius:50%;position:relative;flex:none}
+  .donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#efece2}
+  .pien{display:flex;flex-direction:column;line-height:1.15}
+  .pien b{font-size:20px;font-weight:500}
+  .pien span{font-size:11px;color:#8b8779;letter-spacing:.06em;text-transform:uppercase}
   .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
             pointer-events:auto;cursor:pointer}
   .node .wash{position:absolute;inset:0;mix-blend-mode:screen;opacity:.20;pointer-events:none;
               transition:opacity .25s}
   .node.held .wash{opacity:0}
   .node.front{z-index:9000!important}
-  .node.held{filter:drop-shadow(0 26px 70px rgba(0,0,0,.75))}
-  .node.held .front{background:#efece2;padding:13px}
+  .node.held{filter:drop-shadow(0 22px 60px rgba(0,0,0,.6))}
 
   .label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
          letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
@@ -67,8 +72,8 @@
   #keyhead b{font-weight:400;font-size:14px;line-height:1}
   #keybody{overflow:hidden;margin-top:8px;transition:margin .28s ease,opacity .28s ease}
   #key.shut #keybody{margin-top:0;height:0;opacity:0}
-  #klist{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .chip{display:flex;align-items:center;gap:7px;padding:6px 8px;font-size:12px;text-align:left}
+  #klist{display:flex;flex-wrap:wrap;gap:5px;max-width:360px}
+  .chip{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:12px;text-align:left}
   .chip i{width:8px;height:8px;border-radius:50%;flex:none}
   .chip u{text-decoration:none;flex:1}
   .chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.55;font-variant-numeric:tabular-nums}
@@ -80,6 +85,7 @@
   #flist{display:flex;gap:5px}
   .fbtn{padding:5px 9px;font-size:12px}
   .fbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
+  .kbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
   #clear{margin-top:8px;padding:6px 10px;font-size:12px;font-weight:400}
 
   /* ---- the way in ---- */
@@ -108,9 +114,10 @@
 <div id="dock">
   <div class="panel" id="tabs"></div>
   <div class="panel" id="key">
-    <button class="btn" id="keyhead">What the grid does<b>–</b></button>
+    <button class="btn" id="keyhead">What it does<b>–</b></button>
     <div id="keybody">
       <div id="klist"></div>
+      <div class="freq"><span class="lab">Similar by</span><div id="klind"></div></div>
       <div class="freq"><span class="lab">Seen</span><div id="flist"></div></div>
       <button class="btn" id="clear">Show everything</button>
     </div>
@@ -151,11 +158,22 @@ let panelWasOpen = true;
 
 /* ---------- relationships ---------- */
 const ADJ = DATA.map(() => []);
-META.edges.forEach(([a, b, ma, mb]) => { ADJ[a].push([b, ma, mb]); ADJ[b].push([a, mb, ma]); });
+META.edges.forEach(([a, b, kind, ma, mb]) => {
+  ADJ[a].push([b, kind, ma, mb]); ADJ[b].push([a, kind, mb, ma]);
+});
 const hasMeaning = (i, m) => DATA[i].means.includes(m);
+const kindOn = new Set(['meaning']);                 /* only Meaning finds kin by default */
 const live = i => (!only || hasMeaning(i, only)) && freqOn.has(DATA[i].fb);
-const linksOf = i => ADJ[i].filter(([j, ma, mb]) =>
-  (!only || ma === only || mb === only) && freqOn.has(DATA[j].fb));
+function edgeOk(a, b, kind, ma, mb){
+  if (!kindOn.has(kind)) return false;
+  if (!freqOn.has(DATA[a].fb) || !freqOn.has(DATA[b].fb)) return false;
+  if (only){
+    const touches = kind === 'meaning' ? (ma === only || mb === only) : (hasMeaning(a, only) || hasMeaning(b, only));
+    if (!touches) return false;
+  }
+  return true;
+}
+const linksOf = i => ADJ[i].filter(([j, kind, ma, mb]) => edgeOk(i, j, kind, ma, mb));
 
 /* ---------- the sphere: around is what it does, top to bottom is how often ---------- */
 function rot(u){
@@ -265,12 +283,20 @@ function project(x, y, z){
 }
 const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
   return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`; };
-function stroke(pa, pb, ma, mb, alpha){
-  const ca = META.mcol[ma], cb = META.mcol[mb];
+function grad(pa, pb, ca, cb, alpha){
   if (ca === cb) return rgba(ca, alpha);
   const g = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
   g.addColorStop(0, rgba(ca, alpha)); g.addColorStop(1, rgba(cb, alpha));
   return g;
+}
+function edgeColor(a, b, kind, ma, mb){
+  if (kind === 'meaning') return [META.mcol[ma], META.mcol[mb]];
+  if (kind === 'color')   return [DATA[a].hex, DATA[b].hex];      /* the pictures' own colours */
+  return [META.kindColor[kind], META.kindColor[kind]];            /* theme / composition: one quiet tone */
+}
+function stroke(pa, pb, a, b, kind, ma, mb, alpha){
+  const [ca, cb] = edgeColor(a, b, kind, ma, mb);
+  return grad(pa, pb, ca, cb, alpha);
 }
 const last = new Map();
 function put(el, k, v){                    /* only touch the DOM when it changes */
@@ -348,37 +374,38 @@ function paint(){
     put(el, 'opacity', String(!live(i) ? .08
       : focusI < 0 ? (far ? .3 : 1)
       : (i === focusI ? 1 : kin.has(i) ? .95 : far ? .1 : .24)));
-    put(el, 'zIndex', String((pinned >= 0 && kin.has(i) ? 4000 : 0) + 1000 - Math.round(p.d / 4)));
+    const zi = held ? 30000 : i === focusI ? 25000 : (pinned >= 0 && kin.has(i) ? 20000 : 1000 - Math.round(p.d / 4));
+    put(el, 'zIndex', String(zi));
     el.classList.toggle('front', i === focusI);
   });
 
   /* the resting lines — quiet, but the field is never empty */
   ctx.lineWidth = 1.4;
-  META.edges.forEach(([a, b, ma, mb]) => {
-    if (!freqOn.has(DATA[a].fb) || !freqOn.has(DATA[b].fb)) return;
-    if (only && ma !== only && mb !== only) return;
+  META.edges.forEach(([a, b, kind, ma, mb]) => {
+    if (!edgeOk(a, b, kind, ma, mb)) return;
     let pts;
     if (globe){ pts = arcPts(a, b); if (!pts) return; }
     else { if (!P[a] || !P[b]) return; pts = [P[a], P[b]]; }
-    const base = focusI < 0 ? .34 : .07;
-    ctx.strokeStyle = stroke(pts[0], pts[pts.length - 1], ma, mb, pts.back ? base * .3 : base);
+    const base = (focusI < 0 ? .34 : .07) * (kind === 'meaning' ? 1 : .8);
+    ctx.strokeStyle = stroke(pts[0], pts[pts.length - 1], a, b, kind, ma, mb, pts.back ? base * .3 : base);
     drawPoly(pts);
   });
 
   /* the lines of the picture in hand */
   segs = [];
   if (focusI >= 0 && live(focusI) && P[focusI]){
-    ln.forEach(([j, ma, mb], k) => {
+    ln.forEach(([j, kind, ma, mb], k) => {
       if (!P[j] || !live(j)) return;
       let pts;
       if (pinned >= 0) pts = fanPts(P[focusI], P[j], k);
       else if (globe) pts = arcPts(focusI, j) || [P[focusI], P[j]];
       else pts = [P[focusI], P[j]];
-      segs.push({ pts, j, ma, mb, b: P[j] });
+      segs.push({ pts, j, kind, ma, mb, b: P[j] });
     });
     segs.forEach((sg, k) => {
       const on = k === hotLine;
-      ctx.strokeStyle = on ? GOLD : stroke(sg.pts[0], sg.pts[sg.pts.length - 1], sg.ma, sg.mb, .9);
+      ctx.strokeStyle = on ? GOLD
+        : stroke(sg.pts[0], sg.pts[sg.pts.length - 1], focusI, sg.j, sg.kind, sg.ma, sg.mb, .9);
       ctx.lineWidth = on ? 3.4 : 2;
       drawPoly(sg.pts);
     });
@@ -419,18 +446,39 @@ function paint(){
   });
 }
 
+function donut(slices, total, size){
+  let acc = 0, stops = [];
+  slices.forEach(([color, n]) => {
+    const a0 = acc / total * 360, a1 = (acc + n) / total * 360;
+    stops.push(`${color} ${a0.toFixed(1)}deg ${a1.toFixed(1)}deg`);
+    acc += n;
+  });
+  const bg = stops.length ? `conic-gradient(${stops.join(',')})` : 'var(--line)';
+  return `<div class="donut" style="width:${size}px;height:${size}px;background:${bg}"></div>`;
+}
 function fillBack(el, i, ln){
-  const d = DATA[i], by = {};
-  ln.forEach(([, ma, mb]) => { by[mb] = (by[mb] || 0) + 1; });
+  const d = DATA[i], by = {}, order = [];
+  ln.forEach(([, kind, , mb]) => {
+    const key = kind === 'meaning' ? mb : kind;
+    const label = kind === 'meaning' ? mb : META.kindLabel[kind];
+    const color = kind === 'meaning' ? META.mcol[mb] : (kind === 'color' ? d.hex : META.kindColor[kind]);
+    if (!by[key]) { by[key] = { n: 0, label, color }; order.push(key); }
+    by[key].n++;
+  });
+  const slices = order.map(k => [by[k].color, by[k].n]);
+  const legend = order.map(k =>
+    `<span style="color:${by[k].color}">${by[k].n} ${by[k].label}</span>`).join(' · ');
   el.querySelector('.back').innerHTML =
     `<div class="t">${d.title}</div>
      <div class="r"><span>Does</span><b>${d.means.map(m =>
         `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
      <div class="r"><span>Found in</span><b>${d.place}</b></div>
      <div class="r"><span>Seen</span><b>${META.freqBuckets[d.fb]}</b></div>
-     <div class="r"><span>Joined to</span><b>${ln.length} pictures</b></div>
-     <div class="k">${META.meanings.filter(m => by[m]).map(m =>
-        `<span style="color:${META.mcol[m]}">${by[m]} ${m}</span>`).join(' · ')}</div>`;
+     <div class="pie">
+       ${ln.length ? donut(slices, ln.length, 56) : ''}
+       <div class="pien"><b>${ln.length}</b><span>joined</span></div>
+     </div>
+     <div class="k">${legend || 'nothing else shares this yet'}</div>`;
 }
 
 /* ---------- following a line ---------- */

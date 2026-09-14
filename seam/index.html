@@ -17,7 +17,7 @@
   body.overline{cursor:pointer}
 
   #wire{position:fixed;inset:0;pointer-events:none;z-index:4}
-  #world{position:fixed;inset:0}
+  #world{position:absolute;inset:0}
   .node{position:absolute;will-change:transform;perspective:1600px}
   .card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;
         transition:transform .62s cubic-bezier(.22,.75,.28,1)}
@@ -42,7 +42,6 @@
   .node .wash{position:absolute;inset:0;mix-blend-mode:screen;opacity:.20;pointer-events:none;
               transition:opacity .25s}
   .node.held .wash{opacity:0}
-  .node.front{z-index:9000!important}
   .node.held{filter:drop-shadow(0 22px 60px rgba(0,0,0,.6))}
 
   .label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
@@ -271,7 +270,6 @@ function mkLabel(text, color){
 }
 const placeLabels = META.places.map(p => ({ el: mkLabel(p), at: META.placeAt[p] }));
 const gridLabels  = META.meanings.map(m => ({ el: mkLabel(m, META.mcol[m]), x: META.gridHeads[m] }));
-const sphLabels   = META.meanings.map(m => ({ el: mkLabel(m, META.mcol[m]), u: META.sphereLabel[m] }));
 const poleLabels  = [['seen every day', [0, -1, 0]], ['seen rarely', [0, 1, 0]]]
   .map(([t, u]) => ({ el: mkLabel(t), u }));
 
@@ -434,11 +432,6 @@ function paint(){
     const q = project(o.x, META.gridTop, 0);
     setL(o.el, q, .85 * dim, q ? Math.max(9, Math.min(15, 11 * q.s * 1.5)) : 0);
   });
-  sphLabels.forEach(o => {
-    if (!globe){ o.el.style.opacity = 0; return; }
-    const r = rot(o.u), q = project(r[0] * RS * 1.1, r[1] * RS * 1.1, r[2] * RS * 1.1);
-    setL(o.el, q, (r[2] > 0 ? .12 : .9) * dim, 11);
-  });
   poleLabels.forEach(o => {
     if (!globe){ o.el.style.opacity = 0; return; }
     const r = rot(o.u), q = project(r[0] * RS * 1.16, r[1] * RS * 1.16, r[2] * RS * 1.16);
@@ -565,6 +558,18 @@ klist.querySelectorAll('.chip').forEach(c => c.onclick = e => {
   syncChips(); paint();
 });
 
+const klind = document.getElementById('klind');
+klind.innerHTML = META.kinds.map(k =>
+  `<button class="btn fbtn" data-k="${k}">${META.kindLabel[k]}</button>`).join('');
+const syncKind = () => klind.querySelectorAll('.fbtn')
+  .forEach(b => b.classList.toggle('off', !kindOn.has(b.dataset.k)));
+klind.querySelectorAll('.fbtn').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  const k = b.dataset.k;
+  if (kindOn.has(k)){ if (kindOn.size > 1) kindOn.delete(k); } else kindOn.add(k);
+  syncKind(); paint();
+});
+
 const flist = document.getElementById('flist');
 flist.innerHTML = META.freqBuckets.map((f, k) => `<button class="btn fbtn" data-f="${k}">${f}</button>`).join('');
 const syncFreq = () => flist.querySelectorAll('.fbtn')
@@ -578,7 +583,8 @@ flist.querySelectorAll('.fbtn').forEach(b => b.onclick = e => {
 document.getElementById('clear').onclick = e => {
   e.stopPropagation();
   only = null; [0, 1, 2].forEach(k => freqOn.add(k));
-  syncChips(); syncFreq(); paint();
+  kindOn.clear(); kindOn.add('meaning');
+  syncChips(); syncFreq(); syncKind(); paint();
 };
 document.getElementById('keyhead').onclick = e => {
   e.stopPropagation();
@@ -636,7 +642,7 @@ world.querySelectorAll('img').forEach(img => {
   };
   img.complete ? tick() : (img.onload = tick, img.onerror = tick);
 });
-syncFreq();
+syncFreq(); syncKind();
 paint();
 </script>
 </body>

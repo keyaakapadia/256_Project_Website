@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Seam — image mapping tool</title>
+<title>Skein — image mapping tool</title>
 <style>
   :root{
     --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85; --line:rgba(255,255,255,.28); --gold:#ffc23d;
@@ -54,8 +54,8 @@
          letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 
   /* ---- information: plain type, no outline, never pressable ---- */
-  #mark{position:fixed;left:28px;top:24px;z-index:40;pointer-events:none}
-  #mark b{display:block;font-size:17px;font-weight:500;letter-spacing:-.01em}
+  #mark{padding:2px 4px 12px;pointer-events:none}
+  #mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
   #mark span{font-size:11px;color:var(--soft)}
 
   /* ---- controls: every one outlined, so pressable is legible without colour ---- */
@@ -64,16 +64,19 @@
   .btn:hover{border-color:var(--fg)}
   .btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
 
-  #dock{position:fixed;left:24px;bottom:24px;z-index:40;display:flex;flex-direction:column;
-        gap:8px;align-items:flex-start}
-  .panel{background:rgba(24,24,24,.84);backdrop-filter:blur(14px);border-radius:2px}
-  #tabs{display:flex;gap:6px;padding:6px}
-  #tabs .btn{display:flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;font-size:12px}
+  #dock{position:fixed;left:24px;bottom:24px;z-index:40;padding:14px 14px 10px;width:376px}
+  .panel{background:rgba(24,24,24,.86);backdrop-filter:blur(14px);border-radius:4px}
+  #tabs{display:flex;gap:6px;padding-bottom:12px;margin-bottom:10px;
+        border-bottom:1px solid rgba(255,255,255,.09)}
+  #tabs .btn{display:flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;font-size:12px;flex:1;
+             justify-content:center}
   #tabs svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;
             stroke-linecap:round;stroke-linejoin:round}
-  #key{padding:8px;min-width:344px}
+  #key{padding:0 2px 2px}
   #keyhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;
-           padding:7px 9px;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+           padding:6px 7px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+           border:none;background:none}
+  #keyhead:hover{border:none}
   #keyhead b{font-weight:400;font-size:14px;line-height:1}
   #keybody{overflow:hidden;margin-top:8px;transition:margin .28s ease,opacity .28s ease}
   #key.shut #keybody{margin-top:0;height:0;opacity:0}
@@ -99,9 +102,13 @@
   #entry.gone{opacity:0;pointer-events:none}
   #entry .in{text-align:center}
   #entry h1{margin:0;font-size:58px;font-weight:500;letter-spacing:-.03em}
-  #entry p{margin:10px 0 26px;font-size:17px}
+  #entry .sub{margin:10px 0 28px;font-size:16px;color:var(--soft)}
+  #entry .steps{display:flex;flex-direction:column;gap:9px;margin:0 0 30px;text-align:left;
+                max-width:340px}
+  #entry .steps div{display:flex;align-items:baseline;gap:12px;font-size:14px}
+  #entry .steps b{flex:none;width:16px;color:var(--soft);font-weight:400;font-size:12px}
   #entry .btn{padding:11px 24px;font-size:14px}
-  #entry small{display:block;margin-top:22px;font-size:11px;color:var(--soft)}
+  #entry small{display:block;margin-top:20px;font-size:11px;color:var(--soft)}
 
   #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
         justify-content:center;transition:opacity .7s}
@@ -114,11 +121,10 @@
 <div id="world"></div>
 <canvas id="wire"></canvas>
 
-<div id="mark"><b>Seam</b><span>image mapping tool</span></div>
-
-<div id="dock">
-  <div class="panel" id="tabs"></div>
-  <div class="panel" id="key">
+<div id="dock" class="panel">
+  <div id="mark"><b>Skein</b><span>image mapping tool</span></div>
+  <div id="tabs"></div>
+  <div id="key">
     <button class="btn" id="keyhead">What it does<b>–</b></button>
     <div id="keybody">
       <div id="klist"></div>
@@ -130,10 +136,15 @@
 </div>
 
 <div id="entry" class="gone"><div class="in">
-  <h1>Seam</h1>
-  <p>Pick any image. Follow what it shares.</p>
+  <h1>Skein</h1>
+  <p class="sub">150 grids, tied together by what they share.</p>
+  <div class="steps">
+    <div><b>1</b>Click any image to see its threads</div>
+    <div><b>2</b>Click a thread to follow it to the other end</div>
+    <div><b>3</b>Drag to look around · scroll to zoom in</div>
+  </div>
   <button class="btn" id="start">Start</button>
-  <small>150 grids, tagged by hand · point it at your own set</small>
+  <small>tagged by hand — point it at your own set</small>
 </div></div>
 
 <div id="boot"><div class="s" id="boots">0</div></div>
@@ -141,7 +152,7 @@
 <script src="assets/seam.js"></script>
 <script>
 /* ------------------------------------------------------------------
-   Seam — an image mapping tool.
+   Skein — an image mapping tool.
 
    Every picture carries one or two of nine things a grid can do.
    A line joins two pictures that share something; its colour says
@@ -153,10 +164,10 @@ const world = document.getElementById('world');
 const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
 const TILE = META.tile, GOLD = META.gold, RS = META.sphereR;
 
-let view = 'nodes', focal = 1400, dist = META.views.nodes.dist, camX = 0, camY = 0;
+let view = 'sphere', focal = 1400, dist = META.views.sphere.dist, camX = 0, camY = 0;
 let yaw = 0.5, pitch = -0.2;
 let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false, animating = false, anim = null;
-let hot = -1, pinned = -1, hotLine = -1;
+let hot = -1, pinned = -1, hotLine = -1, downIdx = -1, downFace = null;
 let only = null;
 const freqOn = new Set([0, 1, 2]);
 let panelWasOpen = true;
@@ -255,12 +266,8 @@ const nodes = DATA.map((d, i) => {
   const front = el.querySelector('.front');
   front.addEventListener('mouseenter', () => { hot = i; paint(); });
   front.addEventListener('mouseleave', () => { hot = -1; paint(); });
-  front.addEventListener('click', e => {
-    e.stopPropagation();
-    if (moved) return;
-    pinned === i ? release() : hold(i);
-  });
-  el.querySelector('.back').addEventListener('click', e => { e.stopPropagation(); if (!moved) release(); });
+  front.addEventListener('mousedown', e => { e.stopPropagation(); downIdx = i; downFace = 'front'; });
+  el.querySelector('.back').addEventListener('mousedown', e => { e.stopPropagation(); downIdx = i; downFace = 'back'; });
   el.__i = i;
   world.appendChild(el);
   return el;
@@ -508,17 +515,6 @@ addEventListener('mousemove', e => {
   const k = nearestSeg(e.clientX, e.clientY);
   if (k !== hotLine){ hotLine = k; document.body.classList.toggle('overline', k >= 0); paint(); }
 });
-addEventListener('click', e => {
-  if (moved || e.target.closest('#dock, #entry')) return;
-  if (hotLine >= 0 && segs[hotLine]){
-    const j = segs[hotLine].j;
-    hotLine = -1; document.body.classList.remove('overline');
-    hold(j);
-    return;
-  }
-  if (pinned >= 0) release();
-});
-
 /* ---------- views ---------- */
 function goto(v){
   if (pinned >= 0){ pinned = -1; if (panelWasOpen) key.classList.remove('shut'); setSign(); }
@@ -606,10 +602,24 @@ document.getElementById('keyhead').onclick = e => {
 /* ---------- moving about ---------- */
 addEventListener('mousedown', e => {
   if (e.target.closest('#dock, #entry')) return;
+  downIdx = -1; downFace = null;          /* a node's own mousedown handler sets these, if any */
   drag = true; moved = false; lx = e.clientX; ly = e.clientY; downX = e.clientX; downY = e.clientY;
   document.body.classList.add('drag');
+}, true);                                  /* capture: runs before the node's own mousedown */
+addEventListener('mouseup', e => {
+  drag = false; document.body.classList.remove('drag');
+  if (moved || e.target.closest('#dock, #entry')) return;
+  if (downIdx >= 0){
+    downFace === 'back' ? release() : (pinned === downIdx ? release() : hold(downIdx));
+    return;
+  }
+  if (hotLine >= 0 && segs[hotLine]){
+    const j = segs[hotLine].j;
+    hotLine = -1; document.body.classList.remove('overline');
+    hold(j); return;
+  }
+  if (pinned >= 0) release();
 });
-addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
 addEventListener('mousemove', e => {
   if (!drag) return;
   const dx = e.clientX - lx, dy = e.clientY - ly;

@@ -681,27 +681,45 @@ addEventListener('keydown', enter);
    and the title rises through it. ------------------------------------------ */
 const bootEl = document.getElementById('boot');
 const bcv = document.getElementById('bootwire'), bcx = bcv.getContext('2d');
-const BOOT_MS = 1500;
+const BOOT_MS = 2200;
 const bootRGBA = (hex, a) => { const v = parseInt(hex.slice(1), 16);
   return 'rgba(' + (v >> 16 & 255) + ',' + (v >> 8 & 255) + ',' + (v & 255) + ',' + a + ')'; };
 
-const threads = (() => {
-  const out = [], cols = META.meanings.map(m => META.mcol[m]), pts = [], N = 34;
-  for (let i = 0; i < N; i++){                    /* a loose ring, like the sphere */
-    const a = i / N * Math.PI * 2, r = .30 + Math.random() * .13;
-    pts.push({ x: .5 + Math.cos(a) * r * .62, y: .5 + Math.sin(a) * r });
-  }
-  for (let i = 0; i < 74; i++){
-    const a = pts[(Math.random() * N) | 0], b = pts[(Math.random() * N) | 0];
+const bootCols = META.meanings.map(m => META.mcol[m]);
+
+/* points spread over the WHOLE screen, on a loose lattice — the grid the
+   threads get strung across */
+function bootLattice(cols, rows, jitter){
+  const out = [];
+  for (let cx = 0; cx < cols; cx++)
+    for (let cy = 0; cy < rows; cy++)
+      out.push({ x: (cx + .5) / cols + (Math.random() - .5) * jitter / cols,
+                 y: (cy + .5) / rows + (Math.random() - .5) * jitter / rows });
+  return out;
+}
+const bootPts = bootLattice(11, 7, 1.5);
+const hazePts = bootLattice(14, 9, 1.6);
+
+function bootThreads(pts, n, delaySpan, alpha){
+  const out = [];
+  for (let i = 0; i < n; i++){
+    const a = pts[(Math.random() * pts.length) | 0];
+    let b = pts[(Math.random() * pts.length) | 0];
+    for (let k = 0; k < 3; k++){            /* prefer a nearer partner, so it reads
+                                               as woven rather than as noise */
+      const c = pts[(Math.random() * pts.length) | 0];
+      if (Math.hypot(c.x - a.x, c.y - a.y) < Math.hypot(b.x - a.x, b.y - a.y)) b = c;
+    }
     if (a === b) continue;
-    out.push({ a, b,
-      ca: cols[(Math.random() * cols.length) | 0],
-      cb: cols[(Math.random() * cols.length) | 0],
-      t0: Math.random() * (BOOT_MS * .55),
-      dur: 420 + Math.random() * 380 });
+    out.push({ a, b, alpha,
+      ca: bootCols[(Math.random() * bootCols.length) | 0],
+      cb: bootCols[(Math.random() * bootCols.length) | 0],
+      t0: Math.random() * delaySpan, dur: 420 + Math.random() * 380 });
   }
   return out;
-})();
+}
+const haze    = bootThreads(hazePts, 96, BOOT_MS * .54, .13);
+const threads = bootThreads(bootPts, 130, BOOT_MS * .46, .34);   /* .34 = the tool's own resting alpha */
 
 function bootSize(){
   const d = Math.min(2, devicePixelRatio || 1);
@@ -716,20 +734,27 @@ const bootStart = performance.now();
 let bootDone = false;
 
 function bootFrame(now){
-  const el = now - bootStart;
-  bcx.clearRect(0, 0, innerWidth, innerHeight);
-  bcx.lineWidth = 1.1; bcx.lineCap = 'round';
-  threads.forEach(t => {
-    const p = bootEase(Math.max(0, Math.min(1, (el - t.t0) / t.dur)));
-    if (p <= 0) return;
-    const ax = t.a.x * innerWidth, ay = t.a.y * innerHeight;
-    const bx2 = t.b.x * innerWidth, by2 = t.b.y * innerHeight;
-    const g = bcx.createLinearGradient(ax, ay, bx2, by2);
-    g.addColorStop(0, bootRGBA(t.ca, .8)); g.addColorStop(1, bootRGBA(t.cb, .8));
-    bcx.strokeStyle = g;
-    bcx.beginPath(); bcx.moveTo(ax, ay);
-    bcx.lineTo(ax + (bx2 - ax) * p, ay + (by2 - ay) * p); bcx.stroke();
-  });
+  const el = now - bootStart, W = innerWidth, H = innerHeight;
+  bcx.clearRect(0, 0, W, H);
+  bcx.lineCap = 'round';
+
+  const run = (set, lw) => {
+    bcx.lineWidth = lw;
+    set.forEach(t => {
+      const p = bootEase(Math.max(0, Math.min(1, (el - t.t0) / t.dur)));
+      if (p <= 0) return;
+      const ax = t.a.x * W, ay = t.a.y * H;
+      const bx2 = t.b.x * W, by2 = t.b.y * H;
+      const g = bcx.createLinearGradient(ax, ay, bx2, by2);
+      g.addColorStop(0, bootRGBA(t.ca, t.alpha)); g.addColorStop(1, bootRGBA(t.cb, t.alpha));
+      bcx.strokeStyle = g;
+      bcx.beginPath(); bcx.moveTo(ax, ay);
+      bcx.lineTo(ax + (bx2 - ax) * p, ay + (by2 - ay) * p); bcx.stroke();
+    });
+  };
+  run(haze, 1.0);
+  run(threads, 1.4);   /* 1.4 = the tool's own resting line width */
+
   if (!bootDone) requestAnimationFrame(bootFrame);
 }
 requestAnimationFrame(bootFrame);

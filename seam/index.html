@@ -601,16 +601,21 @@ document.getElementById('keyhead').onclick = e => {
 
 /* ---------- moving about ---------- */
 addEventListener('mousedown', e => {
-  if (e.target.closest('#dock, #entry')) return;
+  if (e.target?.closest?.('#dock, #entry')) return;
   downIdx = -1; downFace = null;          /* a node's own mousedown handler sets these, if any */
   drag = true; moved = false; lx = e.clientX; ly = e.clientY; downX = e.clientX; downY = e.clientY;
   document.body.classList.add('drag');
 }, true);                                  /* capture: runs before the node's own mousedown */
 addEventListener('mouseup', e => {
   drag = false; document.body.classList.remove('drag');
-  if (moved || e.target.closest('#dock, #entry')) return;
-  if (downIdx >= 0){
-    downFace === 'back' ? release() : (pinned === downIdx ? release() : hold(downIdx));
+  if (moved || e.target?.closest?.('#dock, #entry')) return;
+  if (downFace === 'back'){ release(); return; }
+  /* whatever is hovered right now wins — growth-on-hover can shift a picture's
+     box between mousedown and mouseup, so trust the live hover state over
+     whichever element happened to be under the very first pixel of the click */
+  const target = hot >= 0 ? hot : downIdx;
+  if (target >= 0){
+    pinned === target ? release() : hold(target);
     return;
   }
   if (hotLine >= 0 && segs[hotLine]){
@@ -638,7 +643,7 @@ addEventListener('mousemove', e => {
   paint();
 });
 addEventListener('wheel', e => {
-  if (e.target.closest('#dock')) return;
+  if (e.target?.closest?.('#dock')) return;
   e.preventDefault();
   dist = Math.max(700, Math.min(12000, dist * (e.deltaY > 0 ? 1.075 : .93)));
   paint();

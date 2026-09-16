@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loom — image mapping tool</title>
+<style>
+  :root{
+    --bg:#eae6dc; --ink:#211d15; --soft:#78725f; --line:#c9c2ac; --gold:#b8451f;
+    --card:#fbf9f3;
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;
+       overflow:hidden;-webkit-font-smoothing:antialiased;cursor:grab}
+  body.drag{cursor:grabbing}
+  body.overline{cursor:pointer}
+
+  #wire{position:fixed;inset:0;pointer-events:none;z-index:4}
+  #world{position:absolute;inset:0}
+  .node{position:absolute;will-change:transform}
+  .patch{position:relative;width:100%;height:100%;border:2px solid;border-radius:1px;
+         overflow:hidden;background:#d8d2c0;box-shadow:0 1px 2px rgba(33,29,21,.18)}
+  .patch img{display:block;width:100%;height:100%;object-fit:cover;cursor:pointer}
+  .node.held .patch{box-shadow:0 20px 46px rgba(33,29,21,.35);border-width:3px}
+
+  .card{position:absolute;inset:0;background:var(--card);color:var(--ink);
+        display:none;flex-direction:column;justify-content:center;padding:22px 24px;
+        cursor:pointer;border:2px solid}
+  .node.flip .card{display:flex}
+  .node.flip .patch > img{display:none}
+  .card .t{font-size:16px;font-weight:500;line-height:1.28;margin-bottom:14px;letter-spacing:-.01em}
+  .card .r{display:flex;gap:14px;font-size:12.5px;padding:3px 0}
+  .card .r span{color:var(--soft);width:72px;flex:none}
+  .card .r b{font-weight:400;flex:1}
+  .card .k{margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  .bars{display:flex;flex-direction:column;gap:5px}
+  .brow{display:flex;align-items:center;gap:8px;font-size:11px}
+  .brow i{width:6px;height:6px;border-radius:50%;flex:none}
+  .brow u{width:66px;flex:none;text-decoration:none;text-transform:capitalize;color:var(--soft)}
+  .btrack{flex:1;height:5px;background:rgba(33,29,21,.09);border-radius:3px;overflow:hidden}
+  .bfill{height:100%;border-radius:3px}
+  .brow b{width:15px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums}
+  .pie{display:flex;align-items:center;gap:12px;margin-top:12px}
+  .donut{border-radius:50%;position:relative;flex:none}
+  .donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:var(--card)}
+  .pien{display:flex;flex-direction:column;line-height:1.1}
+  .pien b{font-size:19px;font-weight:500}
+  .pien span{font-size:10px;color:var(--soft);letter-spacing:.06em;text-transform:uppercase}
+
+  .label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
+         letter-spacing:.15em;text-transform:uppercase;white-space:nowrap;font-weight:500}
+
+  /* ---- controls: outlined, one weight, colour never signals pressability ---- */
+  .btn{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);
+       border-radius:2px;cursor:pointer;font-weight:500;transition:border-color .15s,background .15s}
+  .btn:hover{border-color:var(--ink)}
+  .btn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+  #dock{position:fixed;left:24px;bottom:24px;z-index:40;padding:14px 16px 12px;width:352px;
+        background:rgba(251,249,243,.92);backdrop-filter:blur(10px);border-radius:3px;
+        border:1px solid var(--line)}
+  #mark{padding-bottom:11px;margin-bottom:11px;border-bottom:1px solid var(--line)}
+  #mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
+  #mark span{font-size:11px;color:var(--soft)}
+  #keyhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;
+           padding:5px 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+           border:none;background:none}
+  #keyhead:hover{border:none}
+  #keyhead b{font-weight:400;font-size:14px;line-height:1}
+  #keybody{overflow:hidden;margin-top:7px;transition:margin .28s ease,opacity .28s ease}
+  #key.shut #keybody{margin-top:0;height:0;opacity:0}
+  #klist{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:12px;text-align:left}
+  .chip i{width:8px;height:8px;border-radius:50%;flex:none}
+  .chip u{text-decoration:none;flex:1}
+  .chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.6;font-variant-numeric:tabular-nums}
+  .chip.dim{opacity:.4}
+  .freq{margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+  .freq .lab{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+             color:var(--soft);margin-bottom:6px}
+  #flist,#klind{display:flex;flex-wrap:wrap;gap:5px}
+  .fbtn{padding:5px 9px;font-size:12px}
+  .fbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
+  #clear{margin-top:8px;padding:6px 10px;font-size:12px;font-weight:400}
+
+  #entry{position:fixed;inset:0;z-index:80;display:grid;place-items:center;
+         background:rgba(234,230,220,.72);backdrop-filter:blur(3px);transition:opacity .45s}
+  #entry.gone{opacity:0;pointer-events:none}
+  #entry .in{text-align:center}
+  #entry h1{margin:0;font-size:56px;font-weight:500;letter-spacing:-.03em}
+  #entry .sub{margin:10px 0 26px;font-size:16px;color:var(--soft)}
+  #entry .steps{display:flex;flex-direction:column;gap:9px;margin:0 0 28px;text-align:left;
+                max-width:320px}
+  #entry .steps div{display:flex;align-items:baseline;gap:12px;font-size:14px}
+  #entry .steps b{flex:none;width:16px;color:var(--soft);font-weight:400;font-size:12px}
+  #entry .btn{padding:11px 24px;font-size:14px;background:var(--ink);color:var(--bg)}
+  #entry small{display:block;margin-top:18px;font-size:11px;color:var(--soft)}
+
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
+        justify-content:center;transition:opacity .7s}
+  #boot.gone{opacity:0;pointer-events:none}
+  #boot .s{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<div id="world"></div>
+<canvas id="wire"></canvas>
+
+<div id="dock">
+  <div id="mark"><b>Loom</b><span>image mapping tool</span></div>
+  <div id="key">
+    <button class="btn" id="keyhead">What it does<b>–</b></button>
+    <div id="keybody">
+      <div id="klist"></div>
+      <div class="freq"><span class="lab">Similar by</span><div id="klind"></div></div>
+      <div class="freq"><span class="lab">Seen</span><div id="flist"></div></div>
+      <button class="btn" id="clear">Show everything</button>
+    </div>
+  </div>
+</div>
+
+<div id="entry" class="gone"><div class="in">
+  <h1>Loom</h1>
+  <p class="sub">150 grids, woven into one cloth.</p>
+  <div class="steps">
+    <div><b>1</b>Click any patch to see its stitches</div>
+    <div><b>2</b>Click a stitch to follow it to the other end</div>
+    <div><b>3</b>Drag to pan · scroll to zoom in</div>
+  </div>
+  <button class="btn" id="start">Start</button>
+  <small>tagged by hand — point it at your own set</small>
+</div></div>
+
+<div id="boot"><div class="s" id="boots">0</div></div>
+
+<script src="assets/loom.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   Loom — flat, not floating. Every picture sits at a fixed address:
+   one block per meaning, sorted within it by how often you'd meet
+   that kind of grid. No view to switch, no depth to fly through —
+   a single cloth, and stitches drawn between whatever two patches
+   share something. Colour is never a signal to click; every control
+   is outlined instead, the same weight throughout.
+------------------------------------------------------------------ */
+
+const world = document.getElementById('world');
+const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
+const TILE = META.tile * 0.62, GOLD = META.gold;
+
+let zoom = 0.62, camX = 0, camY = 0;
+let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false;
+let hot = -1, pinned = -1, hotLine = -1, downIdx = -1, downFace = null;
+let only = null;
+const freqOn = new Set([0, 1, 2]);
+const kindOn = new Set(['meaning']);
+let panelWasOpen = true;
+
+/* ---------- relationships ---------- */
+const ADJ = DATA.map(() => []);
+META.edges.forEach(([a, b, kind, ma, mb]) => {
+  ADJ[a].push([b, kind, ma, mb]); ADJ[b].push([a, kind, mb, ma]);
+});
+const hasMeaning = (i, m) => DATA[i].means.includes(m);
+const live = i => (!only || hasMeaning(i, only)) && freqOn.has(DATA[i].fb);
+function edgeOk(a, b, kind, ma, mb){
+  if (!kindOn.has(kind)) return false;
+  if (!freqOn.has(DATA[a].fb) || !freqOn.has(DATA[b].fb)) return false;
+  if (only){
+    const touches = kind === 'meaning' ? (ma === only || mb === only) : (hasMeaning(a, only) || hasMeaning(b, only));
+    if (!touches) return false;
+  }
+  return true;
+}
+const linksOf = i => ADJ[i].filter(([j, kind, ma, mb]) => edgeOk(i, j, kind, ma, mb));
+
+/* ---------- patches ---------- */
+const nodes = DATA.map((d, i) => {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.innerHTML =
+    `<div class="patch" style="border-color:${d.hex}"><img src="${THUMB(d.thumb)}" alt=""></div>
+     <div class="card" style="border-color:${META.mcol[d.means[0]]}"></div>`;
+  const patch = el.querySelector('.patch');
+  patch.addEventListener('mouseenter', () => { hot = i; paint(); });
+  patch.addEventListener('mouseleave', () => { hot = -1; paint(); });
+  patch.addEventListener('mousedown', e => { e.stopPropagation(); downIdx = i; downFace = 'front'; });
+  el.querySelector('.card').addEventListener('mousedown', e => { e.stopPropagation(); downIdx = i; downFace = 'back'; });
+  el.__i = i;
+  world.appendChild(el);
+  return el;
+});
+
+/* ---------- meaning-block labels, once, in the space ---------- */
+const heads = META.meanings.map(m => {
+  const el = document.createElement('div');
+  el.className = 'label'; el.textContent = m; el.style.color = META.mcol[m];
+  world.appendChild(el);
+  return { m, el, x: META.gridHeads[m] };
+});
+
+function project(x, y){ return { x: innerWidth / 2 + (x - camX) * zoom, y: innerHeight / 2 + (y - camY) * zoom }; }
+const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`; };
+function grad(pa, pb, ca, cb, alpha){
+  if (ca === cb) return rgba(ca, alpha);
+  const g = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
+  g.addColorStop(0, rgba(ca, alpha)); g.addColorStop(1, rgba(cb, alpha));
+  return g;
+}
+function edgeColor(a, b, kind, ma, mb){
+  if (kind === 'meaning') return [META.mcol[ma], META.mcol[mb]];
+  if (kind === 'color') return [DATA[a].hex, DATA[b].hex];
+  return [META.kindColor[kind], META.kindColor[kind]];
+}
+
+const last = new Map();
+function put(el, k, v){
+  const key = el.__i + ':' + k;
+  if (last.get(key) === v) return;
+  last.set(key, v); el.style[k] = v;
+}
+
+function paint(){
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+  const focusI = pinned >= 0 ? pinned : hot;
+  const ln = focusI >= 0 ? linksOf(focusI) : [];
+  const kin = new Set(ln.map(([j]) => j));
+  const w0 = TILE * zoom / 0.62;
+
+  /* every patch, flat, at its fixed address */
+  DATA.forEach((d, i) => {
+    const p = project(d.x, d.y), el = nodes[i], held = i === pinned;
+    let w = w0 * (i === focusI ? 1.35 : 1), h = w;
+    if (held){ w = h = Math.min(innerHeight * .34, 380); }
+    put(el, 'transform', `translate(${Math.round(p.x - w / 2)}px,${Math.round(p.y - h / 2)}px)`);
+    put(el, 'width', Math.round(w) + 'px'); put(el, 'height', Math.round(h) + 'px');
+    put(el, 'opacity', String(!live(i) ? .1 : focusI < 0 ? 1 : (i === focusI ? 1 : kin.has(i) ? .96 : .28)));
+    put(el, 'zIndex', String(held ? 30000 : i === focusI ? 25000 : (pinned >= 0 && kin.has(i) ? 20000 : 100)));
+    el.classList.toggle('held', held);
+    const flip = held && hot === i;
+    el.classList.toggle('flip', flip);
+    if (flip) fillBack(el, i, ln);
+  });
+
+  /* the resting stitches — a running-stitch dash, quiet until something is held */
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.1;
+  META.edges.forEach(([a, b, kind, ma, mb]) => {
+    if (!edgeOk(a, b, kind, ma, mb)) return;
+    const pa = project(DATA[a].x, DATA[a].y), pb = project(DATA[b].x, DATA[b].y);
+    const [ca, cb] = edgeColor(a, b, kind, ma, mb);
+    ctx.strokeStyle = grad(pa, pb, ca, cb, focusI < 0 ? .38 : .08);
+    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+  });
+
+  /* the held or hovered patch's own stitches, drawn solid */
+  ctx.setLineDash([]);
+  if (focusI >= 0 && live(focusI)){
+    const p0 = project(DATA[focusI].x, DATA[focusI].y);
+    const segs = [];
+    ln.forEach(([j, kind, ma, mb]) => {
+      if (!live(j)) return;
+      segs.push({ a: p0, b: project(DATA[j].x, DATA[j].y), j, kind, ma, mb });
+    });
+    window.__segs = segs;
+    segs.forEach((sg, k) => {
+      const on = k === hotLine, [ca, cb] = edgeColor(focusI, sg.j, sg.kind, sg.ma, sg.mb);
+      ctx.strokeStyle = on ? GOLD : grad(sg.a, sg.b, ca, cb, .92);
+      ctx.lineWidth = on ? 2.6 : 1.6;
+      ctx.setLineDash(on ? [] : [7, 4]);
+      ctx.beginPath(); ctx.moveTo(sg.a.x, sg.a.y); ctx.lineTo(sg.b.x, sg.b.y); ctx.stroke();
+    });
+    if (hotLine >= 0 && segs[hotLine]){
+      const t = segs[hotLine].b, s = w0;
+      ctx.setLineDash([]); ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(t.x - s / 2 - 4, t.y - s / 2 - 4, s + 8, s + 8);
+    }
+  } else window.__segs = [];
+
+  heads.forEach(o => {
+    const p = project(o.x, META.gridTop);
+    o.el.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-50%)`;
+    o.el.style.opacity = (focusI < 0 ? .8 : .25) * (zoom > .3 ? 1 : 0);
+    o.el.style.fontSize = Math.max(9, Math.min(14, 11 * zoom / .62)) + 'px';
+  });
+}
+
+function donut(slices, total, size){
+  let acc = 0, stops = [];
+  slices.forEach(([color, n]) => {
+    const a0 = acc / total * 360, a1 = (acc + n) / total * 360;
+    stops.push(`${color} ${a0.toFixed(1)}deg ${a1.toFixed(1)}deg`); acc += n;
+  });
+  const bg = stops.length ? `conic-gradient(${stops.join(',')})` : 'var(--line)';
+  return `<div class="donut" style="width:${size}px;height:${size}px;background:${bg}"></div>`;
+}
+function fillBack(el, i, ln){
+  const d = DATA[i], by = {}, order = [];
+  ln.forEach(([, kind, , mb]) => {
+    const key = kind === 'meaning' ? mb : kind;
+    const label = kind === 'meaning' ? mb : META.kindLabel[kind];
+    const color = kind === 'meaning' ? META.mcol[mb] : (kind === 'color' ? d.hex : META.kindColor[kind]);
+    if (!by[key]) { by[key] = { n: 0, label, color }; order.push(key); }
+    by[key].n++;
+  });
+  order.sort((a, b) => by[b].n - by[a].n);
+  const max = order.length ? by[order[0]].n : 1;
+  const slices = order.map(k => [by[k].color, by[k].n]);
+  const bars = order.map(k => { const row = by[k];
+    return `<div class="brow"><i style="background:${row.color}"></i><u>${row.label}</u>
+      <div class="btrack"><div class="bfill" style="width:${Math.round(row.n / max * 100)}%;background:${row.color}"></div></div>
+      <b>${row.n}</b></div>`; }).join('');
+  const seen = META.freqBuckets[d.fb];
+  el.querySelector('.card').innerHTML =
+    `<div class="t">${d.title}</div>
+     <div class="r"><span>Does</span><b>${d.means.map(m =>
+        `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
+     <div class="r"><span>Found in</span><b>${d.place}</b></div>
+     <div class="r"><span>Seen</span><b>${seen}</b></div>
+     <div class="pie">${ln.length ? donut(slices, ln.length, 52) : ''}
+       <div class="pien"><b>${ln.length}</b><span>joined</span></div></div>
+     <div class="k">${bars || '<span style="color:var(--soft);font-size:12px">nothing else shares this yet</span>'}</div>`;
+}
+
+/* ---------- picking up and putting down a patch ---------- */
+function hold(i){
+  if (pinned < 0) panelWasOpen = !document.getElementById('key').classList.contains('shut');
+  pinned = i; document.getElementById('key').classList.add('shut'); setSign(); paint();
+}
+function release(){
+  if (pinned < 0) return;
+  pinned = -1;
+  if (panelWasOpen) document.getElementById('key').classList.remove('shut');
+  setSign(); paint();
+}
+function setSign(){
+  document.getElementById('keyhead').querySelector('b').textContent =
+    document.getElementById('key').classList.contains('shut') ? '+' : '–';
+}
+
+/* ---------- following a stitch ---------- */
+function nearestSeg(mx, my){
+  let best = -1, bd = 9;
+  (window.__segs || []).forEach((s, k) => {
+    const dx = s.b.x - s.a.x, dy = s.b.y - s.a.y, L = dx * dx + dy * dy; if (!L) return;
+    let t = ((mx - s.a.x) * dx + (my - s.a.y) * dy) / L;
+    t = Math.max(.16, Math.min(1, t));
+    const d = Math.hypot(mx - (s.a.x + dx * t), my - (s.a.y + dy * t));
+    if (d < bd) { bd = d; best = k; }
+  });
+  return best;
+}
+addEventListener('mousemove', e => {
+  if (drag || !window.__segs || !window.__segs.length) return;
+  const k = nearestSeg(e.clientX, e.clientY);
+  if (k !== hotLine){ hotLine = k; document.body.classList.toggle('overline', k >= 0); paint(); }
+});
+
+/* ---------- moving about ---------- */
+addEventListener('mousedown', e => {
+  if (e.target?.closest?.('#dock, #entry')) return;
+  downIdx = -1; downFace = null;
+  drag = true; moved = false; lx = e.clientX; ly = e.clientY; downX = e.clientX; downY = e.clientY;
+  document.body.classList.add('drag');
+}, true);
+addEventListener('mouseup', e => {
+  drag = false; document.body.classList.remove('drag');
+  if (moved || e.target?.closest?.('#dock, #entry')) return;
+  if (downFace === 'back'){ release(); return; }
+  const target = hot >= 0 ? hot : downIdx;
+  if (target >= 0){ pinned === target ? release() : hold(target); return; }
+  if (hotLine >= 0 && window.__segs[hotLine]){
+    const j = window.__segs[hotLine].j;
+    hotLine = -1; document.body.classList.remove('overline');
+    hold(j); return;
+  }
+  if (pinned >= 0) release();
+});
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  const dx = e.clientX - lx, dy = e.clientY - ly;
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) moved = true;
+  lx = e.clientX; ly = e.clientY;
+  camX -= dx / zoom; camY -= dy / zoom;
+  paint();
+});
+addEventListener('wheel', e => {
+  if (e.target?.closest?.('#dock')) return;
+  e.preventDefault();
+  zoom = Math.max(.18, Math.min(2.4, zoom * (e.deltaY > 0 ? .91 : 1.1)));
+  paint();
+}, { passive: false });
+addEventListener('resize', paint);
+
+/* ---------- the key ---------- */
+document.getElementById('klist').innerHTML = META.meanings.map(m =>
+  `<button class="btn chip" data-m="${m}"><i style="background:${META.mcol[m]}"></i>
+     <u>${m}</u><s>${META.mcount[m]}</s></button>`).join('');
+function syncChips(){
+  document.querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('on', c.dataset.m === only);
+    c.classList.toggle('dim', !!only && c.dataset.m !== only);
+  });
+}
+document.querySelectorAll('.chip').forEach(c => c.onclick = e => {
+  e.stopPropagation(); only = only === c.dataset.m ? null : c.dataset.m; syncChips(); paint();
+});
+
+document.getElementById('klind').innerHTML = META.kinds.map(k =>
+  `<button class="btn fbtn" data-k="${k}">${META.kindLabel[k]}</button>`).join('');
+const syncKind = () => document.querySelectorAll('#klind .fbtn')
+  .forEach(b => b.classList.toggle('off', !kindOn.has(b.dataset.k)));
+document.querySelectorAll('#klind .fbtn').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  const k = b.dataset.k;
+  if (kindOn.has(k)){ if (kindOn.size > 1) kindOn.delete(k); } else kindOn.add(k);
+  syncKind(); paint();
+});
+
+document.getElementById('flist').innerHTML = META.freqBuckets.map((f, k) =>
+  `<button class="btn fbtn" data-f="${k}">${f}</button>`).join('');
+const syncFreq = () => document.querySelectorAll('#flist .fbtn')
+  .forEach(b => b.classList.toggle('off', !freqOn.has(+b.dataset.f)));
+document.querySelectorAll('#flist .fbtn').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  const k = +b.dataset.f;
+  if (freqOn.has(k)){ if (freqOn.size > 1) freqOn.delete(k); } else freqOn.add(k);
+  syncFreq(); paint();
+});
+document.getElementById('clear').onclick = e => {
+  e.stopPropagation(); only = null; [0, 1, 2].forEach(k => freqOn.add(k));
+  kindOn.clear(); kindOn.add('meaning'); syncChips(); syncFreq(); syncKind(); paint();
+};
+document.getElementById('keyhead').onclick = e => {
+  e.stopPropagation();
+  document.getElementById('key').classList.toggle('shut'); setSign();
+};
+
+/* ---------- the way in ---------- */
+const entry = document.getElementById('entry');
+const enter = () => entry.classList.add('gone');
+document.getElementById('start').onclick = e => { e.stopPropagation(); enter(); };
+entry.addEventListener('click', e => { e.stopPropagation(); enter(); });
+addEventListener('keydown', enter);
+
+let loaded = 0;
+world.querySelectorAll('img').forEach(img => {
+  const tick = () => {
+    document.getElementById('boots').textContent = `${++loaded} / ${DATA.length}`;
+    if (loaded >= DATA.length) { paint();
+      setTimeout(() => { document.getElementById('boot').classList.add('gone'); entry.classList.remove('gone'); }, 240); }
+  };
+  img.complete ? tick() : (img.onload = tick, img.onerror = tick);
+});
+syncFreq(); syncKind();
+paint();
+</script>
+</body>
+</html>

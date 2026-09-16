@@ -64,11 +64,12 @@
   .btn:hover{border-color:var(--fg)}
   .btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
 
-  #dock{position:fixed;left:24px;bottom:24px;z-index:19500;padding:14px 14px 10px;width:376px}
+  #dock{position:fixed;left:24px;bottom:24px;z-index:19500;padding:14px 14px 10px;width:440px}
   .panel{background:rgba(24,24,24,.86);backdrop-filter:blur(14px);border-radius:4px}
-  #tabs{display:flex;gap:6px;padding-bottom:12px;margin-bottom:10px;
+  #tabs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:12px;margin-bottom:10px;
         border-bottom:1px solid rgba(255,255,255,.09)}
-  #tabs .btn{display:flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;font-size:12px;flex:1;
+  #tabs.away{display:none}
+  #tabs .btn{display:flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;font-size:12px;flex:1 1 auto;min-width:0;
              justify-content:center}
   #tabs svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;
             stroke-linecap:round;stroke-linejoin:round}
@@ -80,7 +81,7 @@
   #keyhead b{font-weight:400;font-size:14px;line-height:1}
   #keybody{overflow:hidden;margin-top:8px;transition:margin .28s ease,opacity .28s ease}
   #key.shut #keybody{margin-top:0;height:0;opacity:0}
-  #klist{display:flex;flex-wrap:wrap;gap:5px;max-width:360px}
+  #klist{display:flex;flex-wrap:wrap;gap:5px}
   .chip{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:12px;text-align:left}
   .chip i{width:8px;height:8px;border-radius:50%;flex:none}
   .chip u{text-decoration:none;flex:1}
@@ -108,11 +109,19 @@
   #entry .steps b{flex:none;width:16px;color:var(--soft);font-weight:400;font-size:12px}
   #entry .btn{padding:11px 24px;font-size:14px}
   #entry small{display:block;margin-top:20px;font-size:11px;color:var(--soft)}
+  /* everything in the way-in rises into place once the threads have settled */
+  #entry .in > *{opacity:0;transform:translateY(12px);
+                 transition:opacity .6s ease,transform .6s ease}
+  #entry.show .in > *{opacity:1;transform:none}
+  #entry.show .in > *:nth-child(1){transition-delay:.06s}
+  #entry.show .in > *:nth-child(2){transition-delay:.15s}
+  #entry.show .in > *:nth-child(3){transition-delay:.24s}
+  #entry.show .in > *:nth-child(4){transition-delay:.33s}
+  #entry.show .in > *:nth-child(5){transition-delay:.42s}
 
-  #boot{position:fixed;inset:0;z-index:41000;background:var(--bg);display:flex;align-items:center;
-        justify-content:center;transition:opacity .7s}
+  #boot{position:fixed;inset:0;z-index:41000;background:var(--bg);transition:opacity .9s ease}
   #boot.gone{opacity:0;pointer-events:none}
-  #boot .s{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+  #bootwire{position:absolute;inset:0;width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -124,7 +133,7 @@
   <div id="mark"><b>Loom</b><span>image mapping tool</span></div>
   <div id="tabs"></div>
   <div id="key">
-    <button class="btn" id="keyhead">What it does<b>–</b></button>
+    <button class="btn" id="keyhead">What connects them<b>–</b></button>
     <div id="keybody">
       <div id="klist"></div>
       <div class="freq"><span class="lab">Similar by</span><div id="klind"></div></div>
@@ -146,7 +155,7 @@
   <small>tagged by hand — point it at your own set</small>
 </div></div>
 
-<div id="boot"><div class="s" id="boots">0</div></div>
+<div id="boot"><canvas id="bootwire"></canvas></div>
 
 <script src="assets/loom.js"></script>
 <script>
@@ -239,14 +248,16 @@ const setSign = () => { key.querySelector('#keyhead b').textContent = key.classL
 function hold(i){
   if (pinned < 0) panelWasOpen = !key.classList.contains('shut');
   pinned = i; camX = camY = 0;
-  key.classList.add('shut'); setSign();          /* inside a picture, its links matter more than the list */
+  tabs.classList.add('away');                    /* inside a picture, the views are not the point */
+  key.classList.remove('shut'); setSign();       /* what connects it is */
   easeTo(buildFocus(i));
   paint();
 }
 function release(){
   if (pinned < 0) return;
   pinned = -1;
-  if (panelWasOpen) key.classList.remove('shut');
+  tabs.classList.remove('away');
+  key.classList.toggle('shut', !panelWasOpen);
   setSign();
   easeTo(baseAll(view), 700, () => baseAll(view));
   paint();
@@ -522,7 +533,8 @@ addEventListener('mousemove', e => {
 });
 /* ---------- views ---------- */
 function goto(v){
-  if (pinned >= 0){ pinned = -1; if (panelWasOpen) key.classList.remove('shut'); setSign(); }
+  if (pinned >= 0){ pinned = -1; tabs.classList.remove('away');
+                    key.classList.toggle('shut', !panelWasOpen); setSign(); }
   view = v; dist = META.views[v].dist; camX = 0; camY = 0;
   const from = pos.map(p => p.slice()), to = baseAll(v), t0 = performance.now(), T = 950;
   animating = true; cancelAnimationFrame(anim);
@@ -662,20 +674,81 @@ document.getElementById('start').onclick = e => { e.stopPropagation(); enter(); 
 entry.addEventListener('click', e => { e.stopPropagation(); enter(); });
 addEventListener('keydown', enter);
 
+/* ---------- the way in draws itself ----------
+   Instead of counting files, the introduction stitches itself: threads in the
+   meanings' own colours, each easing out from nothing, quickly but smoothly.
+   When the pictures are ready the whole cloth dissolves into the background
+   and the title rises through it. ------------------------------------------ */
+const bootEl = document.getElementById('boot');
+const bcv = document.getElementById('bootwire'), bcx = bcv.getContext('2d');
+const BOOT_MS = 1500;
+const bootRGBA = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return 'rgba(' + (v >> 16 & 255) + ',' + (v >> 8 & 255) + ',' + (v & 255) + ',' + a + ')'; };
+
+const threads = (() => {
+  const out = [], cols = META.meanings.map(m => META.mcol[m]), pts = [], N = 34;
+  for (let i = 0; i < N; i++){                    /* a loose ring, like the sphere */
+    const a = i / N * Math.PI * 2, r = .30 + Math.random() * .13;
+    pts.push({ x: .5 + Math.cos(a) * r * .62, y: .5 + Math.sin(a) * r });
+  }
+  for (let i = 0; i < 74; i++){
+    const a = pts[(Math.random() * N) | 0], b = pts[(Math.random() * N) | 0];
+    if (a === b) continue;
+    out.push({ a, b,
+      ca: cols[(Math.random() * cols.length) | 0],
+      cb: cols[(Math.random() * cols.length) | 0],
+      t0: Math.random() * (BOOT_MS * .55),
+      dur: 420 + Math.random() * 380 });
+  }
+  return out;
+})();
+
+function bootSize(){
+  const d = Math.min(2, devicePixelRatio || 1);
+  bcv.width = innerWidth * d; bcv.height = innerHeight * d;
+  bcx.setTransform(d, 0, 0, d, 0, 0);
+}
+bootSize();
+addEventListener('resize', bootSize);
+
+const bootEase = t => 1 - Math.pow(1 - t, 3);
+const bootStart = performance.now();
+let bootDone = false;
+
+function bootFrame(now){
+  const el = now - bootStart;
+  bcx.clearRect(0, 0, innerWidth, innerHeight);
+  bcx.lineWidth = 1.1; bcx.lineCap = 'round';
+  threads.forEach(t => {
+    const p = bootEase(Math.max(0, Math.min(1, (el - t.t0) / t.dur)));
+    if (p <= 0) return;
+    const ax = t.a.x * innerWidth, ay = t.a.y * innerHeight;
+    const bx2 = t.b.x * innerWidth, by2 = t.b.y * innerHeight;
+    const g = bcx.createLinearGradient(ax, ay, bx2, by2);
+    g.addColorStop(0, bootRGBA(t.ca, .8)); g.addColorStop(1, bootRGBA(t.cb, .8));
+    bcx.strokeStyle = g;
+    bcx.beginPath(); bcx.moveTo(ax, ay);
+    bcx.lineTo(ax + (bx2 - ax) * p, ay + (by2 - ay) * p); bcx.stroke();
+  });
+  if (!bootDone) requestAnimationFrame(bootFrame);
+}
+requestAnimationFrame(bootFrame);
+
 let loaded = 0;
+function maybeEnter(){
+  if (bootDone || loaded < DATA.length) return;
+  if (performance.now() - bootStart < BOOT_MS){ setTimeout(maybeEnter, 90); return; }
+  bootDone = true;
+  paint();
+  bootEl.classList.add('gone');          /* the cloth blends into the background */
+  entry.classList.remove('gone');
+  requestAnimationFrame(() => entry.classList.add('show'));   /* the title comes forward */
+}
 world.querySelectorAll('img').forEach(img => {
-  const tick = () => {
-    document.getElementById('boots').textContent = `${++loaded} / ${DATA.length}`;
-    if (loaded >= DATA.length){
-      paint();
-      setTimeout(() => {
-        document.getElementById('boot').classList.add('gone');
-        entry.classList.remove('gone');
-      }, 240);
-    }
-  };
+  const tick = () => { loaded++; maybeEnter(); };
   img.complete ? tick() : (img.onload = tick, img.onerror = tick);
 });
+maybeEnter();
 syncFreq(); syncKind();
 paint();
 </script>

@@ -6,8 +6,8 @@
 <title>Loom — image mapping tool</title>
 <style>
   :root{
-    --bg:#eae6dc; --ink:#211d15; --soft:#78725f; --line:#c9c2ac; --gold:#b8451f;
-    --card:#fbf9f3;
+    --bg:#1b1b1b; --ink:#f5f4f1; --soft:#8d8a85; --line:rgba(255,255,255,.28); --gold:#ffc23d;
+    --card:#efece2;
     --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
   }
   *{box-sizing:border-box}
@@ -21,24 +21,24 @@
   #world{position:absolute;inset:0}
   .node{position:absolute;will-change:transform}
   .patch{position:relative;width:100%;height:100%;border:2px solid;border-radius:1px;
-         overflow:hidden;background:#d8d2c0;box-shadow:0 1px 2px rgba(33,29,21,.18)}
+         overflow:hidden;background:#262626;box-shadow:0 1px 2px rgba(0,0,0,.35)}
   .patch img{display:block;width:100%;height:100%;object-fit:cover;cursor:pointer}
-  .node.held .patch{box-shadow:0 20px 46px rgba(33,29,21,.35);border-width:3px}
+  .node.held .patch{box-shadow:0 22px 60px rgba(0,0,0,.6);border-width:3px}
 
-  .card{position:absolute;inset:0;background:var(--card);color:var(--ink);
+  .card{position:absolute;inset:0;background:var(--card);color:#17150f;
         display:none;flex-direction:column;justify-content:center;padding:22px 24px;
         cursor:pointer;border:2px solid}
   .node.flip .card{display:flex}
   .node.flip .patch > img{display:none}
   .card .t{font-size:16px;font-weight:500;line-height:1.28;margin-bottom:14px;letter-spacing:-.01em}
   .card .r{display:flex;gap:14px;font-size:12.5px;padding:3px 0}
-  .card .r span{color:var(--soft);width:72px;flex:none}
+  .card .r span{color:#8b8779;width:72px;flex:none}
   .card .r b{font-weight:400;flex:1}
-  .card .k{margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  .card .k{margin-top:11px;padding-top:11px;border-top:1px solid rgba(0,0,0,.16)}
   .bars{display:flex;flex-direction:column;gap:5px}
   .brow{display:flex;align-items:center;gap:8px;font-size:11px}
   .brow i{width:6px;height:6px;border-radius:50%;flex:none}
-  .brow u{width:66px;flex:none;text-decoration:none;text-transform:capitalize;color:var(--soft)}
+  .brow u{width:66px;flex:none;text-decoration:none;text-transform:capitalize;color:#5c584d}
   .btrack{flex:1;height:5px;background:rgba(33,29,21,.09);border-radius:3px;overflow:hidden}
   .bfill{height:100%;border-radius:3px}
   .brow b{width:15px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums}
@@ -47,7 +47,7 @@
   .donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:var(--card)}
   .pien{display:flex;flex-direction:column;line-height:1.1}
   .pien b{font-size:19px;font-weight:500}
-  .pien span{font-size:10px;color:var(--soft);letter-spacing:.06em;text-transform:uppercase}
+  .pien span{font-size:10px;color:#8b8779;letter-spacing:.06em;text-transform:uppercase}
 
   .label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
          letter-spacing:.15em;text-transform:uppercase;white-space:nowrap;font-weight:500}
@@ -59,7 +59,7 @@
   .btn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 
   #dock{position:fixed;left:24px;bottom:24px;z-index:40;padding:14px 16px 12px;width:352px;
-        background:rgba(251,249,243,.92);backdrop-filter:blur(10px);border-radius:3px;
+        background:rgba(24,24,24,.86);backdrop-filter:blur(14px);border-radius:3px;
         border:1px solid var(--line)}
   #mark{padding-bottom:11px;margin-bottom:11px;border-bottom:1px solid var(--line)}
   #mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
@@ -86,7 +86,7 @@
   #clear{margin-top:8px;padding:6px 10px;font-size:12px;font-weight:400}
 
   #entry{position:fixed;inset:0;z-index:80;display:grid;place-items:center;
-         background:rgba(234,230,220,.72);backdrop-filter:blur(3px);transition:opacity .45s}
+         background:rgba(20,20,20,.64);backdrop-filter:blur(3px);transition:opacity .45s}
   #entry.gone{opacity:0;pointer-events:none}
   #entry .in{text-align:center}
   #entry h1{margin:0;font-size:56px;font-weight:500;letter-spacing:-.03em}
@@ -95,7 +95,7 @@
                 max-width:320px}
   #entry .steps div{display:flex;align-items:baseline;gap:12px;font-size:14px}
   #entry .steps b{flex:none;width:16px;color:var(--soft);font-weight:400;font-size:12px}
-  #entry .btn{padding:11px 24px;font-size:14px;background:var(--ink);color:var(--bg)}
+  #entry .btn{padding:11px 24px;font-size:14px}
   #entry small{display:block;margin-top:18px;font-size:11px;color:var(--soft)}
 
   #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;
@@ -182,7 +182,7 @@ const nodes = DATA.map((d, i) => {
   const el = document.createElement('div');
   el.className = 'node';
   el.innerHTML =
-    `<div class="patch" style="border-color:${d.hex}"><img src="${THUMB(d.thumb)}" alt=""></div>
+    `<div class="patch" style="border-color:${META.mcol[d.means[0]]}"><img src="${THUMB(d.thumb)}" alt=""></div>
      <div class="card" style="border-color:${META.mcol[d.means[0]]}"></div>`;
   const patch = el.querySelector('.patch');
   patch.addEventListener('mouseenter', () => { hot = i; paint(); });

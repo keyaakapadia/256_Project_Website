@@ -29,8 +29,14 @@
   .back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
   .back .r span{color:#8b8779;width:78px;flex:none}
   .back .r b{font-weight:400;flex:1}
-    .back .k{margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.16);
-           font-size:12px;line-height:1.7;color:#8b8779}
+  .back .k{margin-top:12px;padding-top:13px;border-top:1px solid rgba(0,0,0,.16)}
+  .bars{display:flex;flex-direction:column;gap:6px}
+  .brow{display:flex;align-items:center;gap:9px;font-size:11.5px}
+  .brow i{width:7px;height:7px;border-radius:50%;flex:none}
+  .brow u{width:70px;flex:none;text-decoration:none;text-transform:capitalize;color:#5c584d}
+  .btrack{flex:1;height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden}
+  .bfill{height:100%;border-radius:3px;transition:width .4s ease}
+  .brow b{width:16px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums;color:#17150f}
   .pie{display:flex;align-items:center;gap:14px;margin-top:14px}
   .donut{border-radius:50%;position:relative;flex:none}
   .donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#efece2}
@@ -149,7 +155,7 @@ const TILE = META.tile, GOLD = META.gold, RS = META.sphereR;
 
 let view = 'nodes', focal = 1400, dist = META.views.nodes.dist, camX = 0, camY = 0;
 let yaw = 0.5, pitch = -0.2;
-let drag = false, lx = 0, ly = 0, moved = false, animating = false, anim = null;
+let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false, animating = false, anim = null;
 let hot = -1, pinned = -1, hotLine = -1;
 let only = null;
 const freqOn = new Set([0, 1, 2]);
@@ -358,7 +364,7 @@ function paint(){
     const far = globe && pos[i][2] > 0;          /* the far side of the sphere */
     const big = i === focusI ? 1.25 + 0.75 * (DATA[i].deg / META.maxdeg) : 1;
     let w = TILE * p.s * big * shrink, h = w * .8;
-    if (held){ h = Math.min(innerHeight * .30, 330); w = h / .8; }
+    if (held){ h = Math.min(innerHeight * .40, 430); w = h / .82; }
     else if (pinned >= 0 && kin.has(i)){         /* ringed kin come forward too */
       const floor = Math.min(innerHeight * .15, 150);
       if (h < floor){ h = floor; w = h / .8; }
@@ -458,9 +464,15 @@ function fillBack(el, i, ln){
     if (!by[key]) { by[key] = { n: 0, label, color }; order.push(key); }
     by[key].n++;
   });
+  order.sort((a, b) => by[b].n - by[a].n);
   const slices = order.map(k => [by[k].color, by[k].n]);
-  const legend = order.map(k =>
-    `<span style="color:${by[k].color}">${by[k].n} ${by[k].label}</span>`).join(' · ');
+  const max = order.length ? by[order[0]].n : 1;
+  const bars = order.map(k => {
+    const row = by[k];
+    return `<div class="brow"><i style="background:${row.color}"></i><u>${row.label}</u>
+      <div class="btrack"><div class="bfill" style="width:${Math.round(row.n / max * 100)}%;background:${row.color}"></div></div>
+      <b>${row.n}</b></div>`;
+  }).join('');
   el.querySelector('.back').innerHTML =
     `<div class="t">${d.title}</div>
      <div class="r"><span>Does</span><b>${d.means.map(m =>
@@ -471,7 +483,7 @@ function fillBack(el, i, ln){
        ${ln.length ? donut(slices, ln.length, 56) : ''}
        <div class="pien"><b>${ln.length}</b><span>joined</span></div>
      </div>
-     <div class="k">${legend || 'nothing else shares this yet'}</div>`;
+     <div class="k">${bars || '<span style="color:#8b8779;font-size:12px">nothing else shares this yet</span>'}</div>`;
 }
 
 /* ---------- following a line ---------- */
@@ -594,14 +606,16 @@ document.getElementById('keyhead').onclick = e => {
 /* ---------- moving about ---------- */
 addEventListener('mousedown', e => {
   if (e.target.closest('#dock, #entry')) return;
-  drag = true; moved = false; lx = e.clientX; ly = e.clientY;
+  drag = true; moved = false; lx = e.clientX; ly = e.clientY; downX = e.clientX; downY = e.clientY;
   document.body.classList.add('drag');
 });
 addEventListener('mouseup', () => { drag = false; document.body.classList.remove('drag'); });
 addEventListener('mousemove', e => {
   if (!drag) return;
   const dx = e.clientX - lx, dy = e.clientY - ly;
-  if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+  /* click vs. drag: measure total travel from mousedown, not the last move event —
+     a real mouse or trackpad jitters a few px even on a still click */
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) moved = true;
   lx = e.clientX; ly = e.clientY;
   if (view === 'sphere' && pinned < 0 && !animating){     /* the sphere turns; everything else pans */
     yaw += dx * 0.005;

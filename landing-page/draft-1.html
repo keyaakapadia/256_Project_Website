@@ -113,7 +113,7 @@ const loom = Loom.mount({
   wire:  document.getElementById('wire'),
   floor: document.getElementById('floor'),
   view: 'sphere', sort: 'colour', motion: .4, locked: true,
-  onView: v => panel.onView(v),
+  onView: v => { panel.onView(v); say(''); },
   onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
   onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
@@ -123,8 +123,11 @@ const loom = Loom.mount({
 
 const panel = Panel.build(document.getElementById('controls'), loom);
 const read = document.getElementById('readout');
-const say = h => read.innerHTML = h ||
-  'Hover a picture to see what it is tied to. Click to hold it, click a thread to follow it.';
+/* the strip is the one view you have to push, so it says so */
+const base = () => loom.view === 'timeline'
+  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to hold it.'
+  : 'Hover a picture to see what it is tied to. Click to hold it, click a thread to follow it.';
+const say = h => read.innerHTML = h || base();
 say('');
 
 /* ---------- the cover's nine columns ---------- */

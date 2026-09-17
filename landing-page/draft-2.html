@@ -115,7 +115,7 @@ const loom = Loom.mount({
   wire:  document.getElementById('wire'),
   floor: document.getElementById('floor'),
   view: 'timeline', sort: 'colour', motion: .3,
-  onView: v => panel.onView(v),
+  onView: v => { panel.onView(v); say(''); },
   onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
   onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
@@ -137,8 +137,11 @@ host.appendChild(more);
 const read = document.createElement('div');
 read.id = 'readout';
 more.appendChild(read);
-const say = h => read.innerHTML = h ||
-  'Hover a picture to see what it is tied to. Click to hold it, click a thread to follow it.';
+/* the strip is the one view you have to push, so it says so */
+const base = () => loom.view === 'timeline'
+  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to hold it.'
+  : 'Hover a picture to see what it is tied to. Click to hold it, click a thread to follow it.';
+const say = h => read.innerHTML = h || base();
 say('');
 
 /* ---------- the snap ---------- */

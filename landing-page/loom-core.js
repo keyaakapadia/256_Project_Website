@@ -194,7 +194,7 @@ function mount(opts){
 
   let view = opts.view || 'sphere', sort = opts.sort || 'colour';
   const focal = 1400;
-  let dist = 6000, camX = 0, camY = 0, scrollX = 0, userZoom = false;
+  let dist = 6000, camX = 0, camY = 0, scrollX = 0, scrollV = 0, userZoom = false;
   let yaw = .5, pitch = -.2, motion = opts.motion == null ? .35 : opts.motion, running = false;
   let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false;
   let animating = false, anim = null, locked = !!opts.locked;
@@ -604,7 +604,8 @@ function mount(opts){
   addEventListener('mousedown', e => {
     if (inChrome(e)) return;
     downIdx = -1; downFace = null;
-    drag = true; moved = false; lx = downX = e.clientX; ly = downY = e.clientY;
+    drag = true; moved = false; scrollV = 0;
+    lx = downX = e.clientX; ly = downY = e.clientY;
     document.body.classList.add('drag');
   }, true);                                   /* capture: before a node's own handler */
   addEventListener('mouseup', e => {
@@ -633,7 +634,10 @@ function mount(opts){
         pitch = Math.max(-1.25, Math.min(1.25, pitch + dy * .004));
         pos = scaled();
       } else if (view === 'timeline' && pinned < 0 && !animating){
-        scrollX -= dx / s;                    /* scrub the strip by hand */
+        scrollX -= dx / s;                    /* the strip runs by hand only */
+        /* capped: one very fast move — a flick, or a pointer that jumps — should
+           not fling the strip halfway round its loop */
+        scrollV = Math.max(-140, Math.min(140, -dx / s));
         camY -= dy / s;
         pos = scaled();
       } else { camX -= dx / s; camY -= dy / s; }
@@ -664,9 +668,17 @@ function mount(opts){
   /* ---------- the motion a view has of its own ---------- */
   function frame(){
     if (!running) return;
-    if (pinned < 0 && !drag && !animating && motion > 0){
-      if (view === 'sphere'){ yaw += motion * .0045; pos = scaled(); paint(); }
-      else if (view === 'timeline'){ scrollX += motion * 16; pos = scaled(); paint(); }
+    if (pinned < 0 && !drag && !animating){
+      if (view === 'sphere' && motion > 0){ yaw += motion * .0045; pos = scaled(); paint(); }
+      else if (view === 'timeline'){
+        if (Math.abs(scrollV) > .6){         /* coasting to a stop after a flick */
+          scrollX += scrollV; scrollV *= .93; pos = scaled(); paint();
+        } else if (locked && motion > 0){
+          /* only behind the cover, where nothing can be dragged, does the strip
+             run on its own — in the tool it moves when you move it */
+          scrollX += motion * 16; pos = scaled(); paint();
+        }
+      }
     }
     requestAnimationFrame(frame);
   }
@@ -695,7 +707,7 @@ function mount(opts){
     setOnly(m){ only = m; if (pinned >= 0 && !live(pinned)) pinned = -1; paint(); },
     setLit(m){ lit = m; paint(); },
     setMotion(v){ motion = v; if (v > 0) wake(); paint(); },
-    hasMotion(){ return view === 'sphere' || view === 'timeline'; },
+    hasMotion(){ return view === 'sphere'; },   /* the strip is pushed, not driven */
     reset(){ only = null; lit = null; paint(); },
     setLocked(v){ locked = v; if (v){ pinned = -1; hotCol = null; } },
     setInset(o){ Object.assign(inset, o); fit(); paint(); },

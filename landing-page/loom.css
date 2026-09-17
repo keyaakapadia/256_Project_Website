@@ -34,7 +34,12 @@ body.cover{cursor:default}
           pointer-events:auto;cursor:pointer}
 .node .wash{position:absolute;inset:0;opacity:.16;pointer-events:none;transition:opacity .25s}
 .node.held .wash{opacity:0}
-.node.held{filter:drop-shadow(0 22px 60px rgba(0,0,0,.6))}
+/* only the card being turned over eases its own growth — a transition on every
+   node would drag behind the field on every drag */
+.node.held{filter:drop-shadow(0 26px 70px rgba(0,0,0,.65));
+           transition:width .42s cubic-bezier(.22,.75,.28,1),
+                      height .42s cubic-bezier(.22,.75,.28,1),
+                      transform .42s cubic-bezier(.22,.75,.28,1)}
 
 /* the back of a picture: its own numbers, on paper */
 .back{transform:rotateY(180deg);background:#efece2;color:#17150f;padding:24px 26px;
@@ -73,55 +78,42 @@ body.cover{cursor:default}
      transition:border-color .15s,background .15s,color .15s,opacity .15s}
 .btn:hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
 .btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
-.mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
-.mark span{font-size:11px;color:var(--soft)}
+.mark b{display:block;font-size:17px;font-weight:500;letter-spacing:-.012em}
+
+/* ---- trays of pills: view, sort and the key all read the same ---- */
+.stack{display:flex;flex-direction:column;height:100%}
+.sec{margin-bottom:22px}
 .sect{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);
-      margin:0 2px 8px}
+      margin:0 3px 9px}
+.note{margin:9px 3px 0;font-size:10.5px;line-height:1.45;color:rgba(255,255,255,.34)}
 
-/* ---- the row slider: the whole row is the control ----
-   One gesture for a choice and for a quantity, so View, Sort and Motion
-   all read and behave the same way. */
-.rs{position:relative;display:block;width:100%;height:50px;margin:0 0 7px;padding:0;border:0;
-    border-radius:13px;background:rgba(255,255,255,.055);overflow:hidden;cursor:ew-resize;
-    font:inherit;color:inherit;text-align:left;touch-action:none;
-    -webkit-user-select:none;user-select:none;transition:background .18s}
-.rs:last-child{margin-bottom:0}
-.rs:hover{background:rgba(255,255,255,.085)}
-.rs:focus-visible{outline:1px solid rgba(255,255,255,.4);outline-offset:1px}
-.rs-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:13px;
-         background:rgba(255,255,255,.13);pointer-events:none;
-         transition:width .22s cubic-bezier(.3,.85,.25,1)}
-.rs.live .rs-fill{transition:none}         /* under the finger it must not lag */
-.rs-fill::after{content:"";position:absolute;right:0;top:13px;bottom:13px;width:2px;
-                border-radius:1px;background:rgba(255,255,255,.88)}
-.rs-dots{position:absolute;inset:0;pointer-events:none}
-.rs-dots i{position:absolute;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;
-           border-radius:50%;background:rgba(255,255,255,.2)}
-.rs-lab{position:absolute;left:17px;top:50%;transform:translateY(-50%);font-size:14.5px;
-        pointer-events:none;letter-spacing:-.005em;color:var(--soft);transition:color .18s}
-.rs-val{position:absolute;right:17px;top:50%;transform:translateY(-50%);font-size:14.5px;
-        pointer-events:none;color:var(--fg);font-variant-numeric:tabular-nums}
-.rs.covered .rs-lab{color:var(--fg)}       /* the fill has reached the word */
+.tray{display:grid;gap:3px;padding:4px;background:rgba(255,255,255,.05);border-radius:16px}
+.tray.one{grid-template-columns:1fr}
+.tray.three{grid-template-columns:repeat(3,1fr)}
 
-/* nine meanings, three by three — a grid, which is the point.
-   One tray holds the affordance; only the chosen pill is raised out of it. */
-.klist{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:4px;
-       background:rgba(255,255,255,.05);border-radius:16px}
-/* tight: the tray's own padding and gaps leave about 77px of content per pill,
-   and a name plus its count has to live inside that without spilling */
-.chip{display:flex;align-items:center;gap:6px;padding:9px 8px;font-size:11px;text-align:left;
-      border:none;background:transparent;border-radius:11px;color:var(--fg);overflow:hidden}
-.chip:hover{border:none;background:rgba(255,255,255,.06)}
-.chip.on{border:none;color:var(--fg);background:rgba(255,255,255,.17);
+.pill{display:flex;align-items:center;gap:9px;padding:11px 12px;border:0;border-radius:12px;
+      background:transparent;color:var(--soft);font:inherit;font-size:12.5px;text-align:left;
+      cursor:pointer;overflow:hidden;
+      transition:background .16s,color .16s,box-shadow .16s}
+.pill:hover{background:rgba(255,255,255,.06);color:var(--fg)}
+.pill.on{background:rgba(255,255,255,.17);color:var(--fg);
          box-shadow:0 1px 3px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08)}
-.chip i{width:7px;height:7px;border-radius:50%;flex:none}
-.chip u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chip s{text-decoration:none;flex:none;font-weight:400;font-size:9.5px;opacity:.5;
+.pill.dim{opacity:.4}
+.pill svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;
+          stroke-linecap:round;stroke-linejoin:round;flex:none}
+.pill i{width:7px;height:7px;border-radius:50%;flex:none}
+.pill u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill s{text-decoration:none;flex:none;font-weight:400;font-size:9.5px;opacity:.5;
         font-variant-numeric:tabular-nums}
-.chip.dim{opacity:.42}
+/* tight: a tray of three leaves about 77px of content per pill, and a name
+   plus its count has to live inside that without spilling */
+.tray.three .pill{gap:6px;padding:10px 8px;font-size:11px}
+.tray.centre .pill{justify-content:center;padding:11px 6px}
 
-.quiet{padding:3px 2px;font-size:11px;font-weight:400;border:none;background:none;
-       color:var(--soft);border-radius:0}
-.quiet:hover{border:none;background:none;color:var(--fg)}
+/* the foot sits at the bottom of whatever height the panel has */
+.foot{margin-top:auto;padding-top:20px}
+.quiet{display:block;padding:3px 3px;font-size:11px;font-weight:400;border:0;background:none;
+       color:var(--soft);cursor:pointer;font-family:inherit;transition:color .15s}
+.quiet:hover{color:var(--fg)}
+
 .rule{height:1px;background:var(--edge);margin:15px 0}
-.rs.hide{display:none}

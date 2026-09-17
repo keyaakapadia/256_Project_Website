@@ -58,14 +58,16 @@
 
   /* ---- the panel it opens into ---- */
   #side{position:fixed;left:0;top:0;bottom:0;width:322px;z-index:19500;overflow-y:auto;
-        padding:22px 18px 26px;border-width:0 1px 0 0;border-radius:0;
+        padding:24px 18px 26px;border-width:0 1px 0 0;border-radius:0;
+        display:flex;flex-direction:column;
         transform:translateX(-100%);transition:transform .7s cubic-bezier(.22,.75,.28,1)}
+  #controls{flex:1;min-height:0}
   #side.in{transform:none}
   #side::-webkit-scrollbar{width:7px}
   #side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
-  #head{margin-bottom:18px}
-  #readout{margin-top:16px;padding-top:13px;border-top:1px solid var(--edge);
-           font-size:11px;color:var(--soft);line-height:1.5;min-height:32px}
+  #head{margin-bottom:22px}
+  #readout{margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--edge);
+           font-size:11px;color:var(--soft);line-height:1.55;min-height:30px}
   #readout b{color:var(--fg);font-weight:500}
 </style>
 </head>
@@ -76,9 +78,8 @@
 <canvas id="wire"></canvas>
 
 <aside id="side" class="panel chrome">
-  <div id="head" class="mark"><b>Loom</b><span>image mapping tool</span></div>
+  <div id="head" class="mark"><b>Loom</b></div>
   <div id="controls"></div>
-  <div id="readout"></div>
 </aside>
 
 <div id="cover"><div class="in chrome">
@@ -86,8 +87,8 @@
   <p class="sub">150 grids, tied together by what they share.</p>
   <div id="cols"></div>
   <div class="steps">
-    <div><b>1</b><span>Click any image to see <em>what it is tied to</em></span></div>
-    <div><b>2</b><span>Click a thread to <em>follow it to the other end</em></span></div>
+    <div><b>1</b><span>Hover any image to see <em>what it is tied to</em></span></div>
+    <div><b>2</b><span>Click it to <em>turn it over</em> and read its numbers</span></div>
     <div><b>3</b><span>Pick a colour below to <em>pull its threads forward</em></span></div>
   </div>
   <button class="btn" id="go">Explore</button>
@@ -117,19 +118,21 @@ const loom = Loom.mount({
   onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
   onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
-                         ln.length + ' threads out. Click it again to let go.'),
+                         ln.length + ' threads out. Click it again to turn it back.'),
   onRelease: () => say('')
 });
 
 const panel = Panel.build(document.getElementById('controls'), loom);
-const read = document.getElementById('readout');
+const read = document.createElement('div');
+read.id = 'readout';
+panel.foot.insertBefore(read, panel.foot.firstChild);
 /* every view is bigger than the window on purpose, so each one says how to
    move around its own shape */
 const base = () => loom.view === 'timeline'
-  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to hold it.'
+  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to turn it over.'
   : loom.view === 'sphere'
-  ? 'Drag to turn it. Click a picture to hold it, click a thread to follow it.'
-  : 'Drag to move around it. Click a picture to hold it, click a thread to follow it.';
+  ? 'Drag to turn it. Click a picture to turn it over.'
+  : 'Drag to move around it. Click a picture to turn it over.';
 const say = h => read.innerHTML = h || base();
 say('');
 
@@ -178,7 +181,6 @@ function enter(pickMeaning){
   setTimeout(() => cover.style.display = 'none', 800);
   side.classList.add('in');
   slide(0, SIDE, 700);
-  setTimeout(() => panel.refresh(), 60);        /* the rows can measure themselves now */
   if (pickMeaning) setTimeout(() => loom.setOnly(pickMeaning), 140);
 }
 /* the field re-frames into whatever room is left */

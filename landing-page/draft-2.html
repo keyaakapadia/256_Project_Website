@@ -35,8 +35,9 @@
 
   /* the snap: the same element walks to the edge, then unfolds */
   #box.open{left:0!important;top:0!important;width:330px!important;height:100vh!important;
-            padding:22px 18px 28px!important;border-radius:0 18px 18px 0!important;
+            padding:24px 18px 26px!important;border-radius:0 18px 18px 0!important;
             overflow-y:auto;border-width:0 1px 0 0;
+            display:flex;flex-direction:column;
             box-shadow:22px 0 60px rgba(0,0,0,.5)!important;
             transition:left .58s cubic-bezier(.34,.9,.3,1),
                        width .58s cubic-bezier(.34,.9,.3,1),
@@ -54,10 +55,10 @@
             opacity:0;pointer-events:none;transition:opacity .4s ease}
   #box.open #snapback{opacity:1;pointer-events:auto;transition-delay:.7s}
 
-  /* everything past the first rule waits until you have asked to come in */
-  .more{max-height:0;opacity:0;overflow:hidden;
-        transition:max-height .7s cubic-bezier(.3,.85,.25,1),opacity .45s ease}
-  #box.open .more{max-height:1400px;opacity:1;transition-delay:.26s,.5s}
+  /* the key and the foot wait until you have asked to come in — out of flow,
+     not just hidden, so the card's own height starts small enough to travel */
+  #box:not(.open) .sec.key,#box:not(.open) .foot{display:none}
+  #box.open #controls{flex:1;min-height:0}
 
   #teaser{margin-top:15px;padding-top:14px;border-top:1px solid var(--edge);
           display:flex;align-items:center;justify-content:space-between;gap:16px;
@@ -70,8 +71,8 @@
   #explore i{font-style:normal;transition:transform .25s cubic-bezier(.3,.85,.25,1)}
   #explore:hover i{transform:translateX(-4px)}
 
-  #readout{margin-top:16px;padding-top:13px;border-top:1px solid var(--edge);
-           font-size:11px;color:var(--soft);line-height:1.5;min-height:32px}
+  #readout{margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--edge);
+           font-size:11px;color:var(--soft);line-height:1.55;min-height:30px}
   #readout b{color:var(--fg);font-weight:500}
 </style>
 </head>
@@ -85,12 +86,12 @@
 
 <div id="box" class="panel chrome">
   <div id="bhead">
-    <div class="mark"><b>Loom</b><span>image mapping tool</span></div>
+    <div class="mark"><b>Loom</b></div>
     <button class="btn" id="snapback">&larr; Shrink</button>
   </div>
   <div id="controls"></div>
   <div id="teaser">
-    <p>Push a row to change the view or the order.<br>Explore sends this card to the edge and opens the rest.</p>
+    <p>Pick a view and an order to get a feel for it.<br>Explore sends this card to the edge and opens the rest.</p>
     <button class="btn" id="explore"><i>&larr;</i>Explore</button>
   </div>
 </div>
@@ -119,31 +120,21 @@ const loom = Loom.mount({
   onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
   onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
-                         ln.length + ' threads out. Click it again to let go.'),
+                         ln.length + ' threads out. Click it again to turn it back.'),
   onRelease: () => say('')
 });
 
-const host = document.getElementById('controls');
-const panel = Panel.build(host, loom);
-
-/* fold everything from the first rule down into the part that waits */
-const kids = Array.prototype.slice.call(host.children);
-const cut = kids.findIndex(k => k.classList.contains('rule'));
-const more = document.createElement('div');
-more.className = 'more';
-kids.slice(cut).forEach(k => more.appendChild(k));
-host.appendChild(more);
-
+const panel = Panel.build(document.getElementById('controls'), loom);
 const read = document.createElement('div');
 read.id = 'readout';
-more.appendChild(read);
+panel.foot.insertBefore(read, panel.foot.firstChild);
 /* every view is bigger than the window on purpose, so each one says how to
    move around its own shape */
 const base = () => loom.view === 'timeline'
-  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to hold it.'
+  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to turn it over.'
   : loom.view === 'sphere'
-  ? 'Drag to turn it. Click a picture to hold it, click a thread to follow it.'
-  : 'Drag to move around it. Click a picture to hold it, click a thread to follow it.';
+  ? 'Drag to turn it. Click a picture to turn it over.'
+  : 'Drag to move around it. Click a picture to turn it over.';
 const say = h => read.innerHTML = h || base();
 say('');
 
@@ -165,7 +156,6 @@ function snapOpen(){
   void box.offsetHeight;                   /* flush that geometry, then move */
   box.classList.add('open');
   slide(0, SIDE, 900);
-  setTimeout(() => panel.refresh(), 950);  /* the rows can measure themselves now */
 }
 function snapShut(){
   if (!open) return;
@@ -174,7 +164,6 @@ function snapShut(){
   slide(SIDE, 0, 820);
   setTimeout(() => {                       /* hand the corner back to the stylesheet */
     box.style.top = box.style.left = box.style.width = box.style.height = box.style.bottom = '';
-    panel.refresh();
   }, 880);
 }
 /* the field re-frames into whatever room is left */

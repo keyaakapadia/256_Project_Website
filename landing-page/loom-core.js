@@ -195,7 +195,13 @@ function mount(opts){
   let view = opts.view || 'sphere', sort = opts.sort || 'colour';
   const focal = 1400;
   let dist = 6000, camX = 0, camY = 0, scrollX = 0, scrollV = 0, userZoom = false;
-  let yaw = .5, pitch = -.2, motion = opts.motion == null ? .35 : opts.motion, running = false;
+  let yaw = .5, pitch = -.2, running = false;
+  /* Behind a cover nothing can be touched, so the field shows what it does.
+     In the tool it drifts only until the cursor moves — the first time you
+     reach for it, it is yours and it stops. */
+  const IDLE_SPIN = .0011;
+  let motion = opts.motion == null ? .4 : opts.motion;
+  let restless = !opts.locked;
   let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false;
   let animating = false, anim = null, locked = !!opts.locked;
   let hot = -1, pinned = -1, hotLine = -1, hotCol = null, downIdx = -1, downFace = null;
@@ -263,27 +269,10 @@ function mount(opts){
   relayout();
   let pos = scaled();
 
-  /* ---------- holding a picture ---------- */
-  function buildFocus(i){
-    const ln = linksOf(i), base = scaled(), out = base.map(p => p.slice());
-    out[i] = [0, 0, 0];
-    const R0 = dist * .26, RING = dist * .115;
-    const halfW = (innerWidth - inset.left - inset.right) / 2;
-    const xMul = Math.max(.92, Math.min(1.45, (halfW - 90) / (.26 * focal)));
-    ln.forEach((l, k) => {
-      const ring = Math.floor(k / 12), inRing = k % 12, per = Math.min(12, ln.length - ring * 12);
-      const a = (inRing / per) * Math.PI * 2 - Math.PI / 2 + ring * .26;
-      const r = R0 + ring * RING;
-      out[l[0]] = [Math.cos(a) * r * xMul, Math.sin(a) * r, 0];
-    });
-    const kin = new Set(ln.map(l => l[0]));
-    base.forEach((p, j) => {
-      if (j === i || kin.has(j)) return;
-      const d = Math.hypot(p[0], p[1]) || 1;
-      out[j] = [p[0] / d * dist * .85, p[1] / d * dist * .85, p[2] * .3];
-    });
-    return out;
-  }
+  /* ---------- turning a picture over ----------
+     A click flips the card where it stands and makes it big enough to read.
+     The field does not rearrange itself around it: nothing moves that you
+     did not move. */
   function tween(target, T, done){
     const from = pos.map(p => p.slice()), t0 = performance.now();
     animating = true; cancelAnimationFrame(anim);
@@ -298,15 +287,16 @@ function mount(opts){
     setTimeout(() => { animating = false; pos = done ? done() : target.map(p => p.slice()); paint(); }, T + 60);
   }
   function hold(i){
-    if (locked) return;
-    pinned = i; camX = camY = 0; hotCol = null;
-    tween(buildFocus(i), 700);
+    if (locked || !live(i)) return;
+    pinned = i; hotCol = null; hotLine = -1;
+    document.body.classList.remove('overline');
+    paint();
     if (opts.onHold) opts.onHold(i, linksOf(i));
   }
   function release(){
     if (pinned < 0) return;
     pinned = -1;
-    tween(scaled(), 700, scaled);
+    paint();
     if (opts.onRelease) opts.onRelease();
   }
 
@@ -375,19 +365,6 @@ function mount(opts){
     pts.back = zs / (steps + 1) > .05;
     return pts;
   }
-  function fanPts(a, b, k, steps){
-    steps = steps || 16;
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
-    const bow = Math.min(120, L * .17) * (k % 2 ? 1 : -1);
-    const cx = mx - dy / L * bow, cy = my + dx / L * bow, pts = [];
-    for (let s = 0; s <= steps; s++){
-      const t = s / steps, u = 1 - t;
-      pts.push({ x: u * u * a.x + 2 * u * t * cx + t * t * b.x,
-                 y: u * u * a.y + 2 * u * t * cy + t * t * b.y });
-    }
-    return pts;
-  }
   function drawPoly(c, pts){
     c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
     for (let k = 1; k < pts.length; k++) c.lineTo(pts[k].x, pts[k].y);
@@ -422,8 +399,10 @@ function mount(opts){
     ctx.clearRect(0, 0, innerWidth, innerHeight);
 
     P = pos.map(p => project(p[0], p[1], p[2]));
-    const focusI = pinned >= 0 ? pinned : hot;
-    const ln = focusI >= 0 && live(focusI) ? linksOf(focusI) : [];
+    /* a card that is open owns the screen; the threads follow the hover only
+       while nothing is open */
+    const focusI = pinned < 0 && hot >= 0 && live(hot) ? hot : -1;
+    const ln = focusI >= 0 ? linksOf(focusI) : [];
     const kin = new Set(ln.map(l => l[0]));
     const globe = view === 'sphere' && pinned < 0 && !animating;
     const shrink = view === 'sphere' && pinned < 0 ? .72 : 1;
@@ -436,21 +415,24 @@ function mount(opts){
       if (gone){ put(el, 'opacity', '0'); return; }
       const far = globe && pos[i][2] > 0;
       const big = i === focusI ? 1.25 + .75 * (DATA[i].deg / META.maxdeg) : 1;
-      let w = TILE * p.s * big * shrink, h = w * .8;
-      if (held){ h = Math.min(innerHeight * .40, 430); w = h / .82; }
-      else if (pinned >= 0 && kin.has(i)){
-        const floor = Math.min(innerHeight * .15, 150);
-        if (h < floor){ h = floor; w = h / .8; }
+      let w = TILE * p.s * big * shrink, h = w * .8, cx = p.x, cy = p.y;
+      if (held){
+        h = Math.min(innerHeight * .46, 440); w = h / .82;
+        /* it grows where it stands, nudged only as far as it must be to stay
+           whole and clear of the panel */
+        const L = inset.left + w / 2 + 18, R = innerWidth - inset.right - w / 2 - 18;
+        cx = Math.max(Math.min(L, R), Math.min(Math.max(L, R), p.x));
+        cy = Math.max(h / 2 + 18, Math.min(innerHeight - h / 2 - 18, p.y));
       }
-      put(el, 'transform', 'translate(' + Math.round(p.x - w / 2) + 'px,' + Math.round(p.y - h / 2) + 'px)');
+      put(el, 'transform', 'translate(' + Math.round(cx - w / 2) + 'px,' + Math.round(cy - h / 2) + 'px)');
       put(el, 'width', Math.round(w) + 'px'); put(el, 'height', Math.round(h) + 'px');
       el.classList.toggle('held', held);
-      const flip = held && hot === i;
-      el.classList.toggle('flip', flip);
-      if (flip) fillBack(el, i, ln);
+      el.classList.toggle('flip', held);
+      if (held) fillBack(el, i, linksOf(i));
 
       put(el, 'opacity', String(
-        focusI >= 0 ? (i === focusI ? 1 : kin.has(i) ? .95 : far ? .1 : .24)
+        pinned >= 0 ? (held ? 1 : .26)
+      : focusI >= 0 ? (i === focusI ? 1 : kin.has(i) ? .95 : far ? .1 : .24)
       : colSet ? (colSet.has(i) ? 1 : .2)
       : lit ? (hasMeaning(i, lit) ? 1 : .18)
       : far ? .3 : 1));
@@ -459,7 +441,7 @@ function mount(opts){
          positioned parent, which would put #world on top of every picture and
          make all 150 of them unhittable — no hover, no click, in any view. */
       put(el, 'zIndex', String(held ? 30000 : i === focusI ? 25000
-        : (pinned >= 0 && kin.has(i)) ? 20000 : Math.max(1, 19000 - Math.round(p.d / 4))));
+        : Math.max(1, 19000 - Math.round(p.d / 4))));
     });
 
     paintFloor();
@@ -474,7 +456,7 @@ function mount(opts){
       else { if (!P[a] || !P[b]) return;
              if (view === 'timeline' && Math.abs(P[a].x - P[b].x) > innerWidth * 1.1) return;
              pts = [P[a], P[b]]; }
-      let base = focusI < 0 ? .34 : .07;
+      let base = pinned >= 0 ? .05 : focusI < 0 ? .34 : .07;
       if (lit && focusI < 0) base = (ma === lit || mb === lit) ? .75 : .05;
       if (colSet && focusI < 0) base = (colSet.has(a) || colSet.has(b)) ? .6 : .05;
       ctx.strokeStyle = grad(pts[0], pts[pts.length - 1], META.mcol[ma], META.mcol[mb],
@@ -484,14 +466,11 @@ function mount(opts){
 
     /* the threads of the picture in hand */
     segs = [];
-    if (focusI >= 0 && live(focusI) && P[focusI]){
-      ln.forEach((l, k) => {
+    if (focusI >= 0 && P[focusI]){
+      ln.forEach(l => {
         const j = l[0];
         if (!P[j] || !live(j)) return;
-        let pts;
-        if (pinned >= 0) pts = fanPts(P[focusI], P[j], k);
-        else if (globe) pts = arcPts(focusI, j) || [P[focusI], P[j]];
-        else pts = [P[focusI], P[j]];
+        const pts = globe ? (arcPts(focusI, j) || [P[focusI], P[j]]) : [P[focusI], P[j]];
         segs.push({ pts: pts, j: j, ma: l[1], mb: l[2], b: P[j] });
       });
       segs.forEach((sg, k) => {
@@ -617,7 +596,7 @@ function mount(opts){
   addEventListener('mouseup', e => {
     drag = false; document.body.classList.remove('drag');
     if (moved || inChrome(e) || locked) return;
-    if (downFace === 'back'){ release(); return; }
+    if (downFace === 'back'){ release(); return; }  /* the back is the way out */
     /* trust the live hover over whatever was under the first pixel — growth on
        hover moves a picture's box between mousedown and mouseup */
     const target = hot >= 0 ? hot : downIdx;
@@ -651,6 +630,8 @@ function mount(opts){
       return;
     }
     if (inChrome(e)) return;
+    /* the cursor has arrived: hand the field over and stop drifting */
+    if (restless){ restless = false; }
     let dirty = false;
     if (segs.length){
       const k = nearestSeg(e.clientX, e.clientY);
@@ -677,8 +658,10 @@ function mount(opts){
   function frame(){
     if (!running) return;
     if (pinned < 0 && !drag && !animating){
-      if (view === 'sphere' && motion > 0){ yaw += motion * .0045; pos = scaled(); paint(); }
-      else if (view === 'timeline'){
+      if (view === 'sphere'){
+        const rate = locked ? motion * .0045 : (restless ? IDLE_SPIN : 0);
+        if (rate){ yaw += rate; pos = scaled(); paint(); }
+      } else if (view === 'timeline'){
         if (Math.abs(scrollV) > .6){         /* coasting to a stop after a flick */
           scrollX += scrollV; scrollV *= .93; pos = scaled(); paint();
         } else if (locked && motion > 0){
@@ -714,10 +697,12 @@ function mount(opts){
     goTo: goTo, reSort: reSort, paint: paint, hold: hold, release: release,
     setOnly(m){ only = m; if (pinned >= 0 && !live(pinned)) pinned = -1; paint(); },
     setLit(m){ lit = m; paint(); },
-    setMotion(v){ motion = v; if (v > 0) wake(); paint(); },
-    hasMotion(){ return view === 'sphere'; },   /* the strip is pushed, not driven */
     reset(){ only = null; lit = null; paint(); },
-    setLocked(v){ locked = v; if (v){ pinned = -1; hotCol = null; } },
+    setLocked(v){
+      locked = v;
+      if (v){ pinned = -1; hotCol = null; restless = false; }
+      else { restless = true; wake(); }     /* a slow drift, until the cursor arrives */
+    },
     setInset(o){ Object.assign(inset, o); fit(); paint(); },
     ready(cb){
       let n = 0;

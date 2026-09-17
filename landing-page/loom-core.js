@@ -28,7 +28,7 @@ const VIEWS = {
 };
 const VIEW_ORDER = ['nodes', 'timeline', 'clusters', 'grid', 'sphere'];
 const SORTS = { colour: 'Colour', meaning: 'Meaning', freq: 'Frequency' };
-const SORT_ORDER = ['colour', 'meaning', 'freq'];
+const SORT_ORDER = ['meaning', 'colour', 'freq'];   /* meaning first, and the default */
 const SORT_NOTE = {
   colour: 'neutrals first, then round the wheel',
   meaning: 'grouped by what the grid does',
@@ -90,56 +90,59 @@ function layout(view, sort){
   const ord = order(sort), out = new Array(N), cols = [];
   const G = grouping(sort);
 
+  /* every view groups by the sort, even the ones with no boxes to draw —
+     Nodes and Timeline hang the name off the first picture of each run,
+     the Sphere sets it on the equator, Grid and Clusters box it. */
+  const rank = []; ord.forEach((i, k) => rank[i] = k);
+  const g = {}; G.keys.forEach(k => g[k] = []);
+  ord.forEach(i => g[G.of(i)].push(i));
+  const runs = G.keys.filter(k => g[k].length);
+  const tag = (k, extra) => cols.push(Object.assign(
+    { key: k, label: k, color: G.col(k), items: g[k] }, extra));
+
   if (view === 'nodes'){
     ord.forEach((i, k) => {
+      /* phyllotaxis, first of the sort at the centre */
       const r = 250 * Math.sqrt(k + .7), a = k * 2.399963;
       out[i] = [Math.cos(a) * r * 1.35, Math.sin(a) * r, Math.sin(k * .7) * 380];
     });
+    runs.forEach(k => tag(k, { anchor: g[k][0] }));
   }
 
   else if (view === 'timeline'){
-    /* an endless strip, four bands deep so the whole run has somewhere to be.
-       Every band scrolls in lockstep and wraps at the same width, so the loop
-       never shows a seam; lightness gives each picture a slow wave inside its
-       band, which keeps the run reading as a run and not as a fence. */
+    /* an endless strip, four bands deep. Every band scrolls in lockstep and
+       wraps at the same width, so the loop never shows a seam; lightness gives
+       each picture a slow wave inside its band. */
     const bands = Math.ceil(N / TL_PER);
     ord.forEach((i, k) => {
       const band = Math.floor(k / TL_PER), col = k % TL_PER;
       out[i] = [(col - (TL_PER - 1) / 2) * TL_CW,
                 (band - (bands - 1) / 2) * TL_RH + (DATA[i].lit - 50) * 1.7, 0];
     });
+    runs.forEach(k => tag(k, { anchor: g[k][0] }));
     return { pos: out, columns: cols, loopW: TL_PER * TL_CW };
   }
 
   else if (view === 'grid'){
-    /* every group the same two columns wide, so a column's HEIGHT is its
-       count — the arrangement is a bar chart you can read the pictures in */
-    const g = {}; G.keys.forEach(k => g[k] = []);
-    ord.forEach(i => g[G.of(i)].push(i));
-    const live = G.keys.filter(k => g[k].length);
     /* two wide as a rule, wider only when a group would otherwise run 16 deep
        and drag the whole chart small — area still reads as count either way */
-    const wide = live.map(k => Math.max(G_WIDE, Math.ceil(g[k].length / 16)));
-    const total = wide.reduce((a, b) => a + b, 0) * G_CW + (live.length - 1) * G_GAP;
+    const wide = runs.map(k => Math.max(G_WIDE, Math.ceil(g[k].length / 16)));
+    const total = wide.reduce((a, b) => a + b, 0) * G_CW + (runs.length - 1) * G_GAP;
     let x = -total / 2;
-    live.forEach((k, gi) => {
+    runs.forEach((k, gi) => {
       const items = g[k], w = wide[gi], bw = w * G_CW;
       items.forEach((i, n) => {
         out[i] = [x + (n % w + .5) * G_CW, (Math.floor(n / w) + .5) * G_RH, 0];
       });
-      cols.push({ key: k, label: k, color: G.col(k), x: x + bw / 2, halfW: bw / 2,
-                  top: 0, bottom: Math.ceil(items.length / w) * G_RH, items: items });
+      tag(k, { x: x + bw / 2, halfW: bw / 2,
+               top: 0, bottom: Math.ceil(items.length / w) * G_RH });
       x += bw + G_GAP;
     });
   }
 
   else if (view === 'clusters'){
-    /* the same groups, but loose — shelved three across and centred */
-    const g = {}; G.keys.forEach(k => g[k] = []);
-    ord.forEach(i => g[G.of(i)].push(i));
-    const live = G.keys.filter(k => g[k].length);
-    const per = live.length <= 3 ? live.length : 3;
-    const blocks = live.map(k => {
+    const per = runs.length <= 3 ? runs.length : 3;
+    const blocks = runs.map(k => {
       const n = g[k].length, c = Math.max(1, Math.ceil(Math.sqrt(n * 1.3)));
       return { k: k, items: g[k], c: c, r: Math.ceil(n / c), w: c * CL_CW, h: Math.ceil(n / c) * CL_RH };
     });
@@ -153,12 +156,11 @@ function layout(view, sort){
         /* hang every island from the row's top line, so the whole row's names
            sit on one line and none of them lands inside the block above */
         const cx = x + b.w / 2, cy = y + b.h / 2;
-        b.items.forEach((i, n) => {
-          out[i] = [cx + (n % b.c - (b.c - 1) / 2) * CL_CW,
-                    cy + (Math.floor(n / b.c) - (b.r - 1) / 2) * CL_RH, 0];
+        b.items.forEach((i, m) => {
+          out[i] = [cx + (m % b.c - (b.c - 1) / 2) * CL_CW,
+                    cy + (Math.floor(m / b.c) - (b.r - 1) / 2) * CL_RH, 0];
         });
-        cols.push({ key: b.k, label: b.k, color: G.col(b.k), x: cx, halfW: b.w / 2,
-                    top: cy - b.h / 2, bottom: cy + b.h / 2, items: b.items });
+        tag(b.k, { x: cx, halfW: b.w / 2, top: cy - b.h / 2, bottom: cy + b.h / 2 });
         x += b.w + CL_GAP;
       });
       y += lineH + CL_VGAP;          /* room for the next row's names */
@@ -172,6 +174,11 @@ function layout(view, sort){
       const r = Math.sqrt(Math.max(0, 1 - y * y));
       out[i] = [Math.cos(lon) * r, y, Math.sin(lon) * r];       /* unit — scaled at paint */
     });
+    runs.forEach(k => {                       /* the run's name, set on the equator */
+      const items = g[k], mid = rank[items[Math.floor(items.length / 2)]];
+      const lon = (mid / N) * Math.PI * 2;
+      tag(k, { u: [Math.cos(lon), 0, Math.sin(lon)] });
+    });
     return { pos: out, columns: cols };
   }
 
@@ -181,7 +188,7 @@ function layout(view, sort){
                      if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; });
   const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
   out.forEach(p => { p[0] -= mx; p[1] -= my; });
-  cols.forEach(c => { c.x -= mx; c.top -= my; c.bottom -= my; });
+  cols.forEach(c => { if (c.halfW != null){ c.x -= mx; c.top -= my; c.bottom -= my; } });
   return { pos: out, columns: cols, ext: [x1 - x0, y1 - y0] };
 }
 
@@ -192,7 +199,7 @@ function mount(opts){
   const thumbBase = opts.thumbBase || '../assets/thumb/';
   const SR = META.sphereR;
 
-  let view = opts.view || 'sphere', sort = opts.sort || 'colour';
+  let view = opts.view || 'sphere', sort = opts.sort || 'meaning';
   const focal = 1400;
   let dist = 6000, camX = 0, camY = 0, scrollX = 0, scrollV = 0, userZoom = false;
   let yaw = .5, pitch = -.2, running = false;
@@ -335,7 +342,6 @@ function mount(opts){
     el.innerHTML =
       '<div class="card"><div class="face front">' +
         '<img src="' + thumbBase + d.thumb + '" alt="" draggable="false">' +
-        '<div class="wash" style="background:' + META.mcol[d.means[0]] + '"></div>' +
       '</div><div class="face back"></div></div>';
     const front = el.querySelector('.front');
     front.addEventListener('mouseenter', () => { hot = i; paint(); });
@@ -421,6 +427,7 @@ function mount(opts){
     fx.clearRect(0, 0, innerWidth, innerHeight);
     if (!columns.length || pinned >= 0 || animating) return;
     columns.forEach(c => {
+      if (c.halfW == null) return;            /* a name with no box under it */
       const on = guideCol === c.key;
       const a = project(c.x - c.halfW, c.top, 0), b = project(c.x + c.halfW, c.bottom, 0);
       if (!a || !b) return;
@@ -542,13 +549,29 @@ function mount(opts){
     colLabels.forEach((el, k) => {
       const c = columns[k];
       if (!c || animating || pinned >= 0){ el.style.opacity = 0; return; }
-      const q = project(c.x, c.top, 0);
+      let q, dy = -22, size = 11;
+      if (c.u){                               /* the sphere sets it on the equator */
+        const r = rot(c.u), R = SR * 1.2;
+        if (r[2] > .4){ el.style.opacity = 0; return; }    /* round the far side */
+        q = project(r[0] * R, r[1] * R, r[2] * R); dy = 0;
+      } else if (c.anchor != null){           /* hung off the first of the run */
+        q = P[c.anchor];
+        if (!q || !live(c.anchor)){ el.style.opacity = 0; return; }
+        dy = -(TILE * q.s * .4 + 15);
+      } else {
+        /* a fixed distance above the block ON SCREEN, not in the world — a tall
+           group would otherwise push its own name off the top of the window */
+        q = project(c.x, c.top, 0);
+      }
       if (!q){ el.style.opacity = 0; return; }
-      el.textContent = c.label;
-      /* a fixed distance above the block ON SCREEN, not in the world — a tall
-         group would otherwise push its own name off the top of the window */
-      el.style.transform = 'translate(' + q.x + 'px,' + (q.y - 22) + 'px) translate(-50%,-50%)';
-      el.style.fontSize = Math.max(9, Math.min(15, 11 * q.s * 1.5)) + 'px';
+      if (el.__t !== c.label){ el.textContent = c.label; el.__t = c.label; el.__w = el.offsetWidth; }
+      /* never under the panel and never off the side — measured on the label's
+         own width, since it is centred on its anchor and half of it hangs left */
+      const half = (el.__w || 60) / 2 + 6;
+      if (q.x - half < inset.left || q.x + half > innerWidth - inset.right
+          || q.y < -20 || q.y > innerHeight + 20){ el.style.opacity = 0; return; }
+      el.style.transform = 'translate(' + q.x + 'px,' + (q.y + dy) + 'px) translate(-50%,-50%)';
+      el.style.fontSize = Math.max(9, Math.min(15, size * q.s * 1.5)) + 'px';
       el.style.color = guideCol === c.key ? c.color : '';
       el.classList.toggle('lit', guideCol === c.key);
       el.style.opacity = (hotCol && hotCol !== c.key ? .25 : .85) * dim;
@@ -620,6 +643,7 @@ function mount(opts){
     if (!columns.length || pinned >= 0 || animating) return null;
     for (let k = 0; k < columns.length; k++){
       const c = columns[k];
+      if (c.halfW == null) continue;
       const a = project(c.x - c.halfW, c.top, 0), b = project(c.x + c.halfW, c.bottom, 0);
       if (!a || !b) continue;
       if (mx < a.x - 10 || mx > b.x + 10) continue;

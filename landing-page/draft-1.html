@@ -113,7 +113,7 @@ const loom = Loom.mount({
   world: document.getElementById('world'),
   wire:  document.getElementById('wire'),
   floor: document.getElementById('floor'),
-  view: 'sphere', sort: 'colour', motion: .4, locked: true,
+  view: 'sphere', sort: 'meaning', motion: .4, locked: true,
   onView: v => { panel.onView(v); say(''); },
   onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),

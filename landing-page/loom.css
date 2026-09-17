@@ -30,10 +30,11 @@ body.cover{cursor:default}
       transition:transform .62s cubic-bezier(.22,.75,.28,1)}
 .node.flip .card{transform:rotateY(180deg)}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+/* No colour is laid over a picture. Any opaque wash, at any opacity, lifts a
+   pure black off black — a green meaning turned every dark image dark green —
+   and the meanings are already carried by the threads, the key and the names. */
 .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
           pointer-events:auto;cursor:pointer}
-.node .wash{position:absolute;inset:0;opacity:.16;pointer-events:none;transition:opacity .25s}
-.node.held .wash{opacity:0}
 /* only the card being turned over eases its own growth — a transition on every
    node would drag behind the field on every drag */
 .node.held{filter:drop-shadow(0 26px 70px rgba(0,0,0,.65));

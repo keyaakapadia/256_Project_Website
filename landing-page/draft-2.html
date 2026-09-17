@@ -119,8 +119,9 @@ const loom = Loom.mount({
   onView: v => { panel.onView(v); say(''); },
   onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
-  onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
-                         ln.length + ' threads out. Click it again to turn it back.'),
+  onHold: (i, ln, open) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
+                         ln.length + (open ? ' threads out. Click it again to let go.'
+                                           : ' threads out. Click it again to read it.')),
   onRelease: () => say('')
 });
 
@@ -131,10 +132,10 @@ panel.foot.insertBefore(read, panel.foot.firstChild);
 /* every view is bigger than the window on purpose, so each one says how to
    move around its own shape */
 const base = () => loom.view === 'timeline'
-  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to turn it over.'
+  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to gather its threads.'
   : loom.view === 'sphere'
-  ? 'Drag to turn it. Click a picture to turn it over.'
-  : 'Drag to move around it. Click a picture to turn it over.';
+  ? 'Drag to turn it. Click a picture to gather its threads, again to read it.'
+  : 'Drag to move around it. Click a picture to gather its threads, again to read it.';
 const say = h => read.innerHTML = h || base();
 say('');
 

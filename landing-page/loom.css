@@ -41,26 +41,32 @@ body.cover{cursor:default}
                       height .42s cubic-bezier(.22,.75,.28,1),
                       transform .42s cubic-bezier(.22,.75,.28,1)}
 
-/* the back of a picture: its own numbers, on paper */
-.back{transform:rotateY(180deg);background:#efece2;color:#17150f;padding:24px 26px;
-      display:flex;flex-direction:column;justify-content:center;cursor:pointer}
-.back .t{font-size:17px;font-weight:500;line-height:1.26;margin-bottom:16px;letter-spacing:-.012em}
-.back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
-.back .r span{color:#8b8779;width:78px;flex:none}
+/* the back of a picture: its own numbers, in the panel's own voice — same
+   sans, same uppercase keys, same hairlines, so it reads as part of the tool
+   rather than as a different object that happens to be lying on it */
+.back{transform:rotateY(180deg);background:#161616;color:var(--fg);padding:26px 26px 24px;
+      display:flex;flex-direction:column;justify-content:center;cursor:pointer;
+      border:1px solid rgba(255,255,255,.1)}
+.back .t{font-size:17px;font-weight:500;line-height:1.28;margin-bottom:19px;
+         letter-spacing:-.014em}
+.back .r{display:flex;align-items:baseline;gap:14px;font-size:12.5px;padding:5px 0}
+.back .r span{flex:none;width:76px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+              color:var(--soft)}
 .back .r b{font-weight:400;flex:1}
-.back .k{margin-top:12px;padding-top:13px;border-top:1px solid rgba(0,0,0,.16)}
-.brow{display:flex;align-items:center;gap:9px;font-size:11.5px;margin-bottom:6px}
+.back .k{margin-top:15px;padding-top:15px;border-top:1px solid rgba(255,255,255,.1)}
+.brow{display:flex;align-items:center;gap:9px;font-size:11.5px;margin-bottom:7px}
 .brow i{width:7px;height:7px;border-radius:50%;flex:none}
-.brow u{width:70px;flex:none;text-decoration:none;text-transform:capitalize;color:#5c584d}
-.btrack{flex:1;height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden}
+.brow u{width:70px;flex:none;text-decoration:none;text-transform:capitalize;color:var(--soft)}
+.btrack{flex:1;height:5px;background:rgba(255,255,255,.09);border-radius:3px;overflow:hidden}
 .bfill{height:100%;border-radius:3px}
-.brow b{width:16px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums;color:#17150f}
-.pie{display:flex;align-items:center;gap:14px;margin-top:14px}
+.brow b{width:16px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums;
+        color:var(--fg)}
+.pie{display:flex;align-items:center;gap:15px;margin-top:16px}
 .donut{border-radius:50%;position:relative;flex:none}
-.donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#efece2}
+.donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#161616}
 .pien{display:flex;flex-direction:column;line-height:1.15}
-.pien b{font-size:20px;font-weight:500}
-.pien span{font-size:11px;color:#8b8779;letter-spacing:.06em;text-transform:uppercase}
+.pien b{font-size:21px;font-weight:500}
+.pien span{font-size:9.5px;color:var(--soft);letter-spacing:.14em;text-transform:uppercase}
 
 /* words that live in the space */
 /* z-index above the pictures (which top out near 19000 - depth) and below the
@@ -109,6 +115,9 @@ body.cover{cursor:default}
    plus its count has to live inside that without spilling */
 .tray.three .pill{gap:6px;padding:10px 8px;font-size:11px}
 .tray.centre .pill{justify-content:center;padding:11px 6px}
+/* u is flex:1 by default, so it fills the pill and its text stays left —
+   centring the flex children is not enough on its own */
+.tray.centre .pill u{flex:none;text-align:center}
 
 /* the foot sits at the bottom of whatever height the panel has */
 .foot{margin-top:auto;padding-top:20px}

@@ -6,7 +6,7 @@
 <title>Loom — image mapping tool</title>
 <style>
   :root{
-    --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85; --line:rgba(255,255,255,.28); --gold:#ffc23d;
+    --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85; --line:rgba(255,255,255,.28); --hair:rgba(255,255,255,.13); --gold:#ffc23d;
     --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
   }
   *{box-sizing:border-box}
@@ -58,43 +58,61 @@
   #mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
   #mark span{font-size:11px;color:var(--soft)}
 
-  /* ---- controls: every one outlined, so pressable is legible without colour ---- */
-  .btn{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--line);
-       border-radius:2px;cursor:pointer;font-weight:500;transition:border-color .15s,background .15s}
-  .btn:hover{border-color:var(--fg)}
+  /* ---- controls: pressable reads through outline, fill and weight — never colour ---- */
+  .btn{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--hair);
+       border-radius:5px;cursor:pointer;font-weight:500;
+       transition:border-color .15s,background .15s,color .15s}
+  .btn:hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
   .btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
 
-  #dock{position:fixed;left:24px;bottom:24px;z-index:19500;padding:14px 14px 10px;width:440px}
-  .panel{background:rgba(24,24,24,.86);backdrop-filter:blur(14px);border-radius:4px}
-  #tabs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:12px;margin-bottom:10px;
-        border-bottom:1px solid rgba(255,255,255,.09)}
+  #dock{position:fixed;left:24px;bottom:24px;z-index:19500;padding:13px 13px 11px;width:428px}
+  .panel{background:rgba(21,21,21,.9);backdrop-filter:blur(18px);border-radius:10px;
+         border:1px solid rgba(255,255,255,.07);box-shadow:0 16px 44px rgba(0,0,0,.5)}
+
+  /* the five views as one segmented control, not five competing boxes */
+  #tabs{display:flex;flex-wrap:wrap;gap:2px;padding:3px;margin-bottom:12px;
+        background:rgba(255,255,255,.045);border-radius:8px}
   #tabs.away{display:none}
-  #tabs .btn{display:flex;align-items:center;gap:7px;padding:7px 11px 7px 9px;font-size:12px;flex:1 1 auto;min-width:0;
-             justify-content:center}
-  #tabs svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;
-            stroke-linecap:round;stroke-linejoin:round}
-  #key{padding:0 2px 2px}
+  #tabs .btn{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;
+             gap:6px;padding:7px 4px;font-size:11.5px;border:none;background:transparent;
+             border-radius:6px;color:var(--soft)}
+  #tabs .btn:hover{background:rgba(255,255,255,.06);color:var(--fg)}
+  #tabs .btn.on{background:var(--fg);color:#141414}
+  #tabs svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;
+            stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+  #key{padding:0}
   #keyhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;
-           padding:6px 7px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
-           border:none;background:none}
-  #keyhead:hover{border:none}
-  #keyhead b{font-weight:400;font-size:14px;line-height:1}
-  #keybody{overflow:hidden;margin-top:8px;transition:margin .28s ease,opacity .28s ease}
+           padding:3px 2px 9px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+           border:none;background:none;color:var(--soft)}
+  #keyhead:hover{border:none;background:none;color:var(--fg)}
+  #keyhead b{font-weight:400;font-size:13px;line-height:1}
+  #keybody{overflow:hidden;transition:margin .28s ease,opacity .28s ease}
   #key.shut #keybody{margin-top:0;height:0;opacity:0}
-  #klist{display:flex;flex-wrap:wrap;gap:5px}
-  .chip{display:flex;align-items:center;gap:7px;padding:6px 10px;font-size:12px;text-align:left}
-  .chip i{width:8px;height:8px;border-radius:50%;flex:none}
-  .chip u{text-decoration:none;flex:1}
-  .chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.55;font-variant-numeric:tabular-nums}
-  .chip.dim{opacity:.35}
-  .freq{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1)}
-  .freq .lab{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-             color:var(--soft);margin-bottom:7px}
-  #flist,#klind{display:flex;flex-wrap:wrap;gap:5px}
-  .fbtn{padding:5px 9px;font-size:12px}
+
+  /* nine meanings, three by three — a grid, which is the point */
+  #klist{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+  .chip{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:11.5px;
+        text-align:left;border-radius:6px}
+  .chip i{width:7px;height:7px;border-radius:50%;flex:none}
+  .chip u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.5;
+          font-variant-numeric:tabular-nums}
+  .chip.dim{opacity:.32}
+
+  .freq{margin-top:11px;padding-top:11px;border-top:1px solid rgba(255,255,255,.07);
+        display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .freq .lab{flex:none;width:74px;font-size:9.5px;letter-spacing:.14em;
+             text-transform:uppercase;color:var(--soft)}
+  #flist,#klind{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+  .fbtn{padding:5px 10px;font-size:11.5px;border-radius:5px}
   .fbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
   .kbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
-  #clear{margin-top:8px;padding:6px 10px;font-size:12px;font-weight:400}
+
+  /* a reset is a quiet thing, not another button competing with the filters */
+  #clear{margin-top:10px;padding:3px 2px;font-size:11px;font-weight:400;border:none;
+         background:none;color:var(--soft);border-radius:0}
+  #clear:hover{border:none;background:none;color:var(--fg)}
 
   /* ---- the way in ---- */
   #entry{position:fixed;inset:0;z-index:40000;display:grid;place-items:center;

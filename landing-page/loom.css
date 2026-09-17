@@ -1,0 +1,137 @@
+/* ------------------------------------------------------------------
+   Loom — shared skin for both landing-page drafts.
+   One engine, one set of controls; the drafts differ only in how you
+   are let in.
+------------------------------------------------------------------ */
+:root{
+  --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85;
+  --hair:rgba(255,255,255,.13); --edge:rgba(255,255,255,.07);
+  --gold:#ffc23d;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  --panel:rgba(21,21,21,.9);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:13px;
+     overflow:hidden;-webkit-font-smoothing:antialiased;cursor:grab}
+body.drag{cursor:grabbing}
+body.overline{cursor:pointer}
+body.cover{cursor:default}
+
+/* ---- the three layers: guides under, pictures between, threads over ---- */
+#floor{position:fixed;inset:0;z-index:0;pointer-events:none}
+#world{position:absolute;inset:0}          /* z-index MUST stay auto — see loom-core.js */
+#wire{position:fixed;inset:0;pointer-events:none;z-index:19000}
+
+.node{position:absolute;will-change:transform;perspective:1600px}
+.card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;
+      transition:transform .62s cubic-bezier(.22,.75,.28,1)}
+.node.flip .card{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
+          pointer-events:auto;cursor:pointer}
+.node .wash{position:absolute;inset:0;opacity:.16;pointer-events:none;transition:opacity .25s}
+.node.held .wash{opacity:0}
+.node.held{filter:drop-shadow(0 22px 60px rgba(0,0,0,.6))}
+
+/* the back of a picture: its own numbers, on paper */
+.back{transform:rotateY(180deg);background:#efece2;color:#17150f;padding:24px 26px;
+      display:flex;flex-direction:column;justify-content:center;cursor:pointer}
+.back .t{font-size:17px;font-weight:500;line-height:1.26;margin-bottom:16px;letter-spacing:-.012em}
+.back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
+.back .r span{color:#8b8779;width:78px;flex:none}
+.back .r b{font-weight:400;flex:1}
+.back .k{margin-top:12px;padding-top:13px;border-top:1px solid rgba(0,0,0,.16)}
+.brow{display:flex;align-items:center;gap:9px;font-size:11.5px;margin-bottom:6px}
+.brow i{width:7px;height:7px;border-radius:50%;flex:none}
+.brow u{width:70px;flex:none;text-decoration:none;text-transform:capitalize;color:#5c584d}
+.btrack{flex:1;height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden}
+.bfill{height:100%;border-radius:3px}
+.brow b{width:16px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums;color:#17150f}
+.pie{display:flex;align-items:center;gap:14px;margin-top:14px}
+.donut{border-radius:50%;position:relative;flex:none}
+.donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#efece2}
+.pien{display:flex;flex-direction:column;line-height:1.15}
+.pien b{font-size:20px;font-weight:500}
+.pien span{font-size:11px;color:#8b8779;letter-spacing:.06em;text-transform:uppercase}
+
+/* words that live in the space */
+.label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
+       letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;font-size:11px;
+       transition:color .2s}
+.label.lit{color:var(--fg)}
+
+/* ---- controls: pressable reads through outline, fill and weight, never colour ---- */
+.panel{background:var(--panel);backdrop-filter:blur(18px);border:1px solid var(--edge);
+       box-shadow:0 16px 44px rgba(0,0,0,.5)}
+.btn{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--hair);
+     border-radius:5px;cursor:pointer;font-weight:500;
+     transition:border-color .15s,background .15s,color .15s,opacity .15s}
+.btn:hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
+.btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
+
+.mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
+.mark span{font-size:11px;color:var(--soft)}
+
+.sect{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);
+      margin:0 2px 7px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sect em{font-style:normal;color:rgba(255,255,255,.4);letter-spacing:.02em;text-transform:none;
+         font-size:10.5px;text-align:right}
+
+/* a segmented control — the group carries the affordance, not each button */
+.seg{display:flex;flex-wrap:wrap;gap:2px;padding:3px;background:rgba(255,255,255,.045);
+     border-radius:8px}
+/* flex:1 1 auto + a real min-width so five views WRAP in a narrow sidebar
+   instead of running out past the panel's edge, which is what flex:1 1 0
+   with min-width:0 does the moment the labels stop fitting */
+.seg .btn{flex:1 1 0;min-width:78px;display:flex;align-items:center;justify-content:center;
+          gap:6px;padding:7px 4px;font-size:11.5px;border:none;background:transparent;
+          border-radius:6px;color:var(--soft);overflow:hidden;white-space:nowrap}
+.seg .btn:hover{background:rgba(255,255,255,.06);color:var(--fg)}
+.seg .btn.on{background:var(--fg);color:#141414}
+.seg svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;
+         stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* sliders — the fiddly things made easy */
+.sliders{display:flex;flex-direction:column;gap:9px}
+.sld{display:flex;align-items:center;gap:10px}
+.sld.hide{display:none}
+.sld label{flex:none;width:58px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+           color:var(--soft)}
+.sld output{flex:none;width:30px;text-align:right;font-size:10.5px;color:rgba(255,255,255,.45);
+            font-variant-numeric:tabular-nums}
+.sld input{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:16px;background:none;
+           cursor:pointer;margin:0}
+.sld input::-webkit-slider-runnable-track{height:3px;border-radius:2px;
+           background:rgba(255,255,255,.14)}
+.sld input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+           background:var(--fg);margin-top:-4.5px;
+           box-shadow:0 1px 4px rgba(0,0,0,.5);transition:transform .12s}
+.sld input:hover::-webkit-slider-thumb{transform:scale(1.18)}
+.sld input::-moz-range-track{height:3px;border-radius:2px;background:rgba(255,255,255,.14)}
+.sld input::-moz-range-thumb{width:12px;height:12px;border:none;border-radius:50%;
+           background:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.5)}
+
+/* nine meanings, three by three — a grid, which is the point */
+.klist{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.chip{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:11.5px;text-align:left;
+      border-radius:6px}
+.chip i{width:7px;height:7px;border-radius:50%;flex:none}
+.chip u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.5;
+        font-variant-numeric:tabular-nums}
+.chip.dim{opacity:.32}
+
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.row .lab{flex:none;width:62px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+          color:var(--soft)}
+.pills{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+.fbtn{padding:5px 10px;font-size:11.5px;border-radius:5px}
+.fbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
+
+.quiet{padding:3px 2px;font-size:11px;font-weight:400;border:none;background:none;
+       color:var(--soft);border-radius:0}
+.quiet:hover{border:none;background:none;color:var(--fg)}
+
+.rule{height:1px;background:var(--edge);margin:13px 0}
+.stack > * + *{margin-top:13px}

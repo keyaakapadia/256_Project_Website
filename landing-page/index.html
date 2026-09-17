@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loom — two ways in</title>
+<link rel="stylesheet" href="loom.css">
+<style>
+  /* plain flow, not place-items:center — a centred grid item shrink-to-fits and
+     then pushes its own top off the screen once the content is tall */
+  html,body{height:auto;min-height:100%}
+  body{overflow:auto;cursor:auto;padding:56px 24px 72px}
+  .sheet{width:100%;max-width:880px;margin:0 auto}
+  h1{margin:0;font-size:52px;font-weight:500;letter-spacing:-.035em}
+  .sub{margin:10px 0 40px;color:var(--soft);font-size:15px}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+  /* NOT .card — loom.css owns that name for a picture's flip card, which is
+     position:absolute;inset:0 and would rip these out of the grid entirely */
+  a.pick{display:block;padding:24px;border-radius:12px;text-decoration:none;color:inherit;
+         transition:border-color .18s,transform .18s,background .18s}
+  a.pick:hover{border-color:rgba(255,255,255,.22);transform:translateY(-3px);
+               background:rgba(255,255,255,.02)}
+  a.pick b{display:block;font-size:19px;font-weight:500;margin-bottom:4px;letter-spacing:-.01em}
+  a.pick .n{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
+  a.pick p{margin:14px 0 0;font-size:13px;color:var(--soft);line-height:1.55}
+  .art{height:112px;margin:18px 0 0;border-radius:8px;position:relative;overflow:hidden;
+       background:#141414;border:1px solid var(--edge)}
+  .art i{position:absolute;display:block}
+  .foot{margin-top:34px;font-size:12px;color:var(--soft);line-height:1.6}
+  .foot code{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>Loom</h1>
+  <p class="sub">Two introductions to the same tool. Same engine, same controls — they differ only in how you are let in.</p>
+
+  <div class="two">
+    <a class="pick panel" href="draft-1.html">
+      <span class="n">Draft 1</span>
+      <b>The cover</b>
+      <div class="art" id="a1"></div>
+      <p>The name sits over the field, which is already turning. The nine colours
+         underneath are the legend and the first control at once — touch one and every
+         line carrying that meaning comes forward. Explore fades the cover and slides
+         the panel in from the left.</p>
+    </a>
+
+    <a class="pick panel" href="draft-2.html">
+      <span class="n">Draft 2</span>
+      <b>The snap</b>
+      <div class="art" id="a2"></div>
+      <p>A card in the corner that already works: pick a view, pick an order, watch the
+         field answer. Ask for more and the same card walks to the left edge and unfolds
+         into the full panel, while the field slides across into what is left.</p>
+    </a>
+  </div>
+
+  <p class="foot">
+    Five views — Nodes, Timeline, Clusters, Grid, Sphere — each sorted by
+    <code>Colour</code>, <code>Meaning</code> or <code>Frequency</code>.
+    The lines are the meanings of the grids: a line's colour says what two pictures share.
+  </p>
+</div>
+<script>
+/* a still of each draft, drawn rather than screenshotted so it never goes stale */
+const C = ['#a954d4','#a9d454','#54a9d4','#5454d4','#d4a954','#d45454','#d454a9','#54d4a9','#54d454'];
+const a1 = document.getElementById('a1');
+let h = '';
+for (let k = 0; k < 42; k++){                       /* draft 1: a turning field behind a word */
+  const a = k / 42 * Math.PI * 2, r = 34 + (k % 5) * 7;
+  h += '<i style="left:' + (50 + Math.cos(a) * r * .9) + '%;top:' + (50 + Math.sin(a) * r * .8) +
+       '%;width:3px;height:3px;border-radius:50%;background:' + C[k % 9] + ';opacity:.7"></i>';
+}
+h += '<i style="left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;' +
+     'font-size:26px;font-weight:500;letter-spacing:-.03em;color:#f5f4f1">Loom</i>';
+a1.innerHTML = h;
+
+const a2 = document.getElementById('a2');           /* draft 2: a card walking to the edge */
+h = '<i style="left:0;top:0;bottom:0;width:30%;background:rgba(255,255,255,.07);' +
+    'border-right:1px solid rgba(255,255,255,.14)"></i>';
+for (let k = 0; k < 30; k++){
+  h += '<i style="left:' + (36 + (k % 10) * 6.2) + '%;top:' + (24 + Math.floor(k / 10) * 22) +
+       '%;width:16px;height:13px;border-radius:2px;background:' + C[k % 9] + ';opacity:.55"></i>';
+}
+for (let k = 0; k < 4; k++)
+  h += '<i style="left:8%;top:' + (22 + k * 15) + '%;width:14%;height:3px;border-radius:2px;' +
+       'background:rgba(255,255,255,.22)"></i>';
+a2.innerHTML = h;
+</script>
+</body>
+</html>

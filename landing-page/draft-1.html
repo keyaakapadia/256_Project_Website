@@ -6,24 +6,25 @@
 <title>Loom — draft 1, the cover</title>
 <link rel="stylesheet" href="loom.css">
 <style>
-  /* ---- draft 1: the name sits over the thing itself, already moving ---- */
+  /* ---- draft 1: the name sits over the thing itself, already working ---- */
   #veil{position:fixed;inset:0;z-index:41000;background:var(--bg);transition:opacity .7s ease}
   #veil.gone{opacity:0;pointer-events:none}
 
   #cover{position:fixed;inset:0;z-index:30000;display:grid;place-items:center;
-         pointer-events:none;                      /* the sphere still turns underneath */
-         background:radial-gradient(ellipse at 50% 45%,rgba(20,20,20,.34) 0%,
-                    rgba(20,20,20,.72) 46%,rgba(20,20,20,.9) 100%);
+         pointer-events:none;                      /* the field still turns underneath */
+         /* heavy enough in the middle to carry type over a moving field —
+            the views shuffle underneath and some of them are very busy */
+         background:radial-gradient(ellipse at 50% 46%,rgba(20,20,20,.62) 0%,
+                    rgba(20,20,20,.84) 46%,rgba(20,20,20,.95) 100%);
          transition:opacity .75s ease}
   #cover.gone{opacity:0}
   #cover .in{text-align:center;pointer-events:auto;padding:0 32px;max-width:940px}
-  #cover h1{margin:0;font-size:clamp(62px,11vw,136px);font-weight:500;letter-spacing:-.045em;
+  #cover h1{margin:0;font-size:clamp(58px,10vw,126px);font-weight:500;letter-spacing:-.045em;
             line-height:.92}
-  #cover .sub{margin:14px 0 0;font-size:clamp(14px,1.5vw,18px);color:var(--soft);
-              letter-spacing:.01em}
+  #cover .sub{margin:14px 0 0;font-size:clamp(14px,1.5vw,18px);color:var(--soft)}
 
   /* the nine columns — the legend for every line in the field behind */
-  #cols{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:44px auto 0;max-width:780px}
+  #cols{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:40px auto 0;max-width:760px}
   #cols button{background:none;border:0;padding:10px 2px 0;cursor:pointer;font:inherit;
                color:var(--soft);display:flex;flex-direction:column;align-items:center;gap:9px;
                transition:color .2s,opacity .25s}
@@ -32,11 +33,19 @@
   #cols button span{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
   #cols button:hover,#cols button.lit{color:var(--fg)}
   #cols button:hover b,#cols button.lit b{opacity:1;transform:scaleY(3.2)}
-  #cols.dimmed button:not(.lit):not(:hover){opacity:.42}
+  #cols.dimmed button:not(.lit):not(:hover){opacity:.4}
 
-  #go{margin-top:40px;padding:13px 30px;font-size:14px;border-radius:6px;
+  /* the three things you can do, kept from the first build */
+  .steps{display:flex;flex-direction:column;gap:9px;margin:34px auto 0;text-align:left;
+         max-width:392px}
+  .steps div{display:flex;align-items:baseline;gap:13px;font-size:14px;
+             color:rgba(255,255,255,.62)}
+  .steps b{flex:none;width:15px;font-weight:400;font-size:11.5px;
+           color:rgba(255,255,255,.34);font-variant-numeric:tabular-nums}
+  .steps em{font-style:normal;color:var(--fg)}
+
+  #go{margin-top:36px;padding:13px 30px;font-size:14px;border-radius:7px;
       border:1px solid rgba(255,255,255,.34)}
-  #hint{margin-top:18px;font-size:11px;color:rgba(255,255,255,.34);letter-spacing:.04em}
 
   #cover .in > *{opacity:0;transform:translateY(14px);
                  transition:opacity .8s ease,transform .8s ease}
@@ -45,17 +54,16 @@
   #cover.up .in > *:nth-child(2){transition-delay:.16s}
   #cover.up .in > *:nth-child(3){transition-delay:.28s}
   #cover.up .in > *:nth-child(4){transition-delay:.40s}
-  #cover.up .in > *:nth-child(5){transition-delay:.50s}
+  #cover.up .in > *:nth-child(5){transition-delay:.52s}
 
   /* ---- the panel it opens into ---- */
-  #side{position:fixed;left:0;top:0;bottom:0;width:312px;z-index:19500;overflow-y:auto;
-        padding:20px 18px 26px;border-width:0 1px 0 0;border-radius:0;
+  #side{position:fixed;left:0;top:0;bottom:0;width:322px;z-index:19500;overflow-y:auto;
+        padding:22px 18px 26px;border-width:0 1px 0 0;border-radius:0;
         transform:translateX(-100%);transition:transform .7s cubic-bezier(.22,.75,.28,1)}
   #side.in{transform:none}
   #side::-webkit-scrollbar{width:7px}
   #side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
-  #head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
-  #back{padding:5px 9px;font-size:11px;border-radius:5px;color:var(--soft)}
+  #head{margin-bottom:18px}
   #readout{margin-top:16px;padding-top:13px;border-top:1px solid var(--edge);
            font-size:11px;color:var(--soft);line-height:1.5;min-height:32px}
   #readout b{color:var(--fg);font-weight:500}
@@ -68,10 +76,7 @@
 <canvas id="wire"></canvas>
 
 <aside id="side" class="panel chrome">
-  <div id="head">
-    <div class="mark"><b>Loom</b><span>image mapping tool</span></div>
-    <button class="btn" id="back">Cover</button>
-  </div>
+  <div id="head" class="mark"><b>Loom</b><span>image mapping tool</span></div>
   <div id="controls"></div>
   <div id="readout"></div>
 </aside>
@@ -80,8 +85,12 @@
   <h1>Loom</h1>
   <p class="sub">150 grids, tied together by what they share.</p>
   <div id="cols"></div>
+  <div class="steps">
+    <div><b>1</b><span>Click any image to see <em>what it is tied to</em></span></div>
+    <div><b>2</b><span>Click a thread to <em>follow it to the other end</em></span></div>
+    <div><b>3</b><span>Pick a colour below to <em>pull its threads forward</em></span></div>
+  </div>
   <button class="btn" id="go">Explore</button>
-  <div id="hint">drag to turn it · hover a colour to pull its threads forward</div>
 </div></div>
 
 <div id="veil"></div>
@@ -92,19 +101,20 @@
 <script>
 /* ------------------------------------------------------------------
    Draft 1 — the cover.
-   The name sits over the working thing, which is already turning. The
-   nine colours under it are the legend and the first control at once:
-   touch one and every line that carries that meaning comes forward.
+   The name sits over the working thing, which is already moving: the
+   field shuffles through all five views on its own, the sphere turns,
+   the strip runs, and the nine colours underneath take it in turns to
+   come forward. Touch one and it stays.
 ------------------------------------------------------------------ */
-const SIDE = 312;
+const SIDE = 322;
 
 const loom = Loom.mount({
   world: document.getElementById('world'),
   wire:  document.getElementById('wire'),
   floor: document.getElementById('floor'),
-  view: 'sphere', sort: 'colour', locked: true,
+  view: 'sphere', sort: 'colour', motion: .4, locked: true,
   onView: v => panel.onView(v),
-  onZoom: () => panel.onZoom(),
+  onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
   onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
                          ln.length + ' threads out. Click it again to let go.'),
@@ -113,7 +123,8 @@ const loom = Loom.mount({
 
 const panel = Panel.build(document.getElementById('controls'), loom);
 const read = document.getElementById('readout');
-const say = h => read.innerHTML = h || 'Hover a picture to see what it is tied to. Click to hold it.';
+const say = h => read.innerHTML = h ||
+  'Hover a picture to see what it is tied to. Click to hold it, click a thread to follow it.';
 say('');
 
 /* ---------- the cover's nine columns ---------- */
@@ -122,7 +133,7 @@ cols.innerHTML = META.meanings.map(m =>
   '<button data-m="' + m + '"><b style="background:' + META.mcol[m] + '"></b>' +
   '<span>' + m + '</span></button>').join('');
 
-let idle = null, cycle = 0, hovering = false;
+let idle = null, step = 0, hovering = false;
 const lift = m => {
   loom.setLit(m);
   cols.classList.toggle('dimmed', !!m);
@@ -133,12 +144,17 @@ cols.querySelectorAll('button').forEach(b => {
   b.onmouseleave = () => { hovering = false; lift(null); };
   b.onclick = e => { e.stopPropagation(); enter(b.dataset.m); };
 });
-/* left alone, it walks the nine by itself — the motion at the back */
+
+/* left alone it walks the five views and the nine meanings by itself —
+   the whole tool demonstrating itself behind its own name */
 function startIdle(){
+  if (idle) return;
   idle = setInterval(() => {
-    if (hovering) return;
-    lift(META.meanings[cycle++ % META.meanings.length]);
-  }, 2600);
+    if (inside) return;
+    step++;
+    loom.goTo(Loom.VIEW_ORDER[step % Loom.VIEW_ORDER.length]);
+    if (!hovering) lift(META.meanings[step % META.meanings.length]);
+  }, 5400);
 }
 function stopIdle(){ clearInterval(idle); idle = null; lift(null); }
 
@@ -150,44 +166,31 @@ function enter(pickMeaning){
   if (inside) return;
   inside = true;
   stopIdle();
-  loom.spin(0);
   loom.setLocked(false);
   document.body.classList.remove('cover');
   cover.classList.add('gone');
   setTimeout(() => cover.style.display = 'none', 800);
   side.classList.add('in');
   slide(0, SIDE, 700);
-  if (pickMeaning) setTimeout(() => loom.setOnly(pickMeaning), 120);
+  setTimeout(() => panel.refresh(), 60);        /* the rows can measure themselves now */
+  if (pickMeaning) setTimeout(() => loom.setOnly(pickMeaning), 140);
 }
-function leave(){
-  if (!inside) return;
-  inside = false;
-  loom.release(); loom.setOnly(null); loom.setLocked(true);
-  loom.goTo('sphere'); panel.pickView('sphere');
-  loom.spin(.0016);
-  document.body.classList.add('cover');
-  side.classList.remove('in');
-  slide(SIDE, 0, 700);
-  cover.style.display = '';
-  void cover.offsetHeight;                 /* reflow, not rAF — see below */
-  cover.classList.remove('gone');
-  startIdle();
-}
-/* the field re-centres into whatever room is left */
+/* the field re-frames into whatever room is left */
 function slide(from, to, T){
   const t0 = performance.now();
-  (function step(now){
+  (function walk(now){
     const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
     loom.setInset({ left: from + (to - from) * e });
-    if (u < 1) requestAnimationFrame(step);
+    if (u < 1) requestAnimationFrame(walk);
   })(t0);
 }
 document.getElementById('go').onclick = e => { e.stopPropagation(); enter(); };
-document.getElementById('back').onclick = e => { e.stopPropagation(); leave(); };
-addEventListener('keydown', e => { if (e.key === 'Escape') inside ? leave() : null; else if (!inside) enter(); });
+addEventListener('keydown', e => {
+  if (!inside){ enter(); return; }
+  if (e.key === 'Escape') loom.release();
+});
 
 /* ---------- open ---------- */
-loom.spin(.0016);                       /* a slow turn, not a spin */
 loom.ready(() => {
   document.getElementById('veil').classList.add('gone');
   /* a forced reflow, not requestAnimationFrame: rAF is suspended while the tab

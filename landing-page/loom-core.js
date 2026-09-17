@@ -2,14 +2,15 @@
    Loom — the engine, shared by both landing-page drafts.
 
    Every picture carries one or two of nine things a grid can do.
-   A line joins two pictures that share something; its colour says
-   which of the nine, and a line that changes colour crossed from one
-   meaning into another. That is the whole legend: the lines ARE the
-   meanings of the grids.
+   A line joins two pictures that share a meaning; its colour says
+   which, and a line that changes colour crossed from one meaning into
+   another. That is the whole legend: the lines ARE the meanings of the
+   grids. Same rule as index.html — only meaning ties a picture to
+   another, so the field never fills with lines that say nothing.
 
-   A view decides the shape the pictures are laid into.
-   A sort decides the order they are laid in.
-   The two are independent, so every pairing is a real arrangement.
+   A view is a shape. A sort is an order — and, where a view groups,
+   the sort is also what it groups and labels by. Change the sort and
+   the column names change with it.
 
    Loads after ../assets/loom.js, which defines DATA and META.
 ------------------------------------------------------------------ */
@@ -18,13 +19,12 @@
 
 const N = DATA.length, TILE = META.tile, GOLD = META.gold;
 
-/* ---------- views and sorts ---------- */
 const VIEWS = {
-  nodes:    { label: 'Nodes',    dist: 10300 },
-  timeline: { label: 'Timeline', dist: 8600  },
-  clusters: { label: 'Clusters', dist: 10600 },
-  grid:     { label: 'Grid',     dist: 10600 },
-  sphere:   { label: 'Sphere',   dist: 6400  }
+  nodes:    { label: 'Nodes'    },
+  timeline: { label: 'Timeline' },
+  clusters: { label: 'Clusters' },
+  grid:     { label: 'Grid'     },
+  sphere:   { label: 'Sphere'   }
 };
 const VIEW_ORDER = ['nodes', 'timeline', 'clusters', 'grid', 'sphere'];
 const SORTS = { colour: 'Colour', meaning: 'Meaning', freq: 'Frequency' };
@@ -42,23 +42,27 @@ const ICON = {
   sphere:   '<circle cx="10" cy="10" r="7"/><ellipse cx="10" cy="10" rx="3.2" ry="7"/><path d="M3 10h14"/>'
 };
 
-/* ---------- colour families, for reading a colour sort ---------- */
-const FAMILY = [[15,'red'],[45,'orange'],[70,'yellow'],[160,'green'],[200,'cyan'],
+/* ---------- what a sort groups and names things by ---------- */
+const FAMS = ['neutral', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'violet', 'magenta'];
+const FAMCOL = { neutral:'#9a968d', red:'#d45454', orange:'#d48a54', yellow:'#d4c454',
+                 green:'#7ad454', cyan:'#54c4d4', blue:'#5470d4', violet:'#9a54d4', magenta:'#d454a9' };
+const FAMCUT = [[15,'red'],[45,'orange'],[70,'yellow'],[160,'green'],[200,'cyan'],
                 [255,'blue'],[290,'violet'],[335,'magenta'],[361,'red']];
-const familyOf = d => d.sat < 8 ? 'neutral' : FAMILY.find(f => d.hue < f[0])[1];
+const familyOf = d => d.sat < 8 ? 'neutral' : FAMCUT.find(f => d.hue < f[0])[1];
+const FREQCOL = ['#e6e2d8', '#a8a49a', '#6b6860'];
 
 const MIDX = {}; META.meanings.forEach((m, i) => MIDX[m] = i);
 const FMIN = Math.min.apply(null, DATA.map(d => d.freq));
 const FMAX = Math.max.apply(null, DATA.map(d => d.freq));
 const fnorm = d => (d.freq - FMIN) / (FMAX - FMIN || 1);
 
-/* the colour a picture is filed under, for the strip beneath the ribbon */
-function sortColour(i, sort){
-  const d = DATA[i];
-  if (sort === 'colour')  return d.hex;
-  if (sort === 'meaning') return META.mcol[d.means[0]];
-  const g = Math.round(210 - fnorm(d) * 150);
-  return '#' + ((g << 16 | g << 8 | g) | 0x1000000).toString(16).slice(1);
+function grouping(sort){
+  if (sort === 'meaning')
+    return { keys: META.meanings, of: i => DATA[i].means[0], col: k => META.mcol[k] };
+  if (sort === 'colour')
+    return { keys: FAMS, of: i => familyOf(DATA[i]), col: k => FAMCOL[k] };
+  return { keys: META.freqBuckets, of: i => META.freqBuckets[DATA[i].fb],
+           col: k => FREQCOL[META.freqBuckets.indexOf(k)] };
 }
 
 function order(sort){
@@ -77,99 +81,108 @@ function order(sort){
   return idx;
 }
 
-/* ---------- the five shapes ----------
-   Each returns positions plus the columns it was built from, so the
-   guides drawn underneath are the real structure, not decoration. */
-/* 15 x 10 so all 150 fit the screen at once at the view's own distance —
-   the whole run is the point of a timeline, not a slice of it */
-const TL_COLS = 15, TL_CW = 380, TL_RH = 380;
-const GRID_TOP = -1400, G_CW = 300, G_RH = 255, G_GAP = 165;
-const CL_CW = 275, CL_RH = 235;
+/* ---------- the five shapes ---------- */
+const TL_CW = 360, TL_PER = 38, TL_RH = 420;        /* the endless strip's pitch */
+const G_CW = 300, G_RH = 255, G_GAP = 170, G_WIDE = 2;
+const CL_CW = 275, CL_RH = 235, CL_GAP = 420, CL_VGAP = 560;
 
 function layout(view, sort){
   const ord = order(sort), out = new Array(N), cols = [];
+  const G = grouping(sort);
 
   if (view === 'nodes'){
     ord.forEach((i, k) => {
-      /* phyllotaxis: 210 keeps all 150 inside the room left beside the panel
-         at this view's distance, with the first of the sort at the centre */
-      const r = 210 * Math.sqrt(k + .7), a = k * 2.399963;
+      const r = 250 * Math.sqrt(k + .7), a = k * 2.399963;
       out[i] = [Math.cos(a) * r * 1.35, Math.sin(a) * r, Math.sin(k * .7) * 380];
     });
   }
 
   else if (view === 'timeline'){
-    const rows = Math.ceil(N / TL_COLS);
-    const bucket = [];
+    /* an endless strip, four bands deep so the whole run has somewhere to be.
+       Every band scrolls in lockstep and wraps at the same width, so the loop
+       never shows a seam; lightness gives each picture a slow wave inside its
+       band, which keeps the run reading as a run and not as a fence. */
+    const bands = Math.ceil(N / TL_PER);
     ord.forEach((i, k) => {
-      const row = Math.floor(k / TL_COLS);
-      let col = k % TL_COLS;
-      if (row % 2) col = TL_COLS - 1 - col;     /* serpentine, so the order never jumps back */
-      out[i] = [(col - (TL_COLS - 1) / 2) * TL_CW, (row - (rows - 1) / 2) * TL_RH, 0];
-      (bucket[col] || (bucket[col] = [])).push(i);
+      const band = Math.floor(k / TL_PER), col = k % TL_PER;
+      out[i] = [(col - (TL_PER - 1) / 2) * TL_CW,
+                (band - (bands - 1) / 2) * TL_RH + (DATA[i].lit - 50) * 1.7, 0];
     });
-    bucket.forEach((items, col) => cols.push({
-      key: 'c' + col, label: '', color: null,
-      x: (col - (TL_COLS - 1) / 2) * TL_CW, halfW: TL_CW / 2,
-      top: -(rows / 2) * TL_RH, bottom: (rows / 2) * TL_RH, items
-    }));
+    return { pos: out, columns: cols, loopW: TL_PER * TL_CW };
   }
 
   else if (view === 'grid'){
-    const g = {}; META.meanings.forEach(m => g[m] = []);
-    ord.forEach(i => g[DATA[i].means[0]].push(i));
-    /* every meaning gets the SAME two columns, so a block's height is its
+    /* every group the same two columns wide, so a column's HEIGHT is its
        count — the arrangement is a bar chart you can read the pictures in */
-    const w = META.meanings.map(() => 2);
-    const total = w.reduce((a, b) => a + b, 0) * G_CW + (META.meanings.length - 1) * G_GAP;
+    const g = {}; G.keys.forEach(k => g[k] = []);
+    ord.forEach(i => g[G.of(i)].push(i));
+    const live = G.keys.filter(k => g[k].length);
+    /* two wide as a rule, wider only when a group would otherwise run 16 deep
+       and drag the whole chart small — area still reads as count either way */
+    const wide = live.map(k => Math.max(G_WIDE, Math.ceil(g[k].length / 16)));
+    const total = wide.reduce((a, b) => a + b, 0) * G_CW + (live.length - 1) * G_GAP;
     let x = -total / 2;
-    META.meanings.forEach((m, gi) => {
-      const items = g[m], bw = w[gi] * G_CW;
-      items.forEach((i, k) => {
-        out[i] = [x + (k % w[gi] + .5) * G_CW, GRID_TOP + (Math.floor(k / w[gi]) + .5) * G_RH, 0];
+    live.forEach((k, gi) => {
+      const items = g[k], w = wide[gi], bw = w * G_CW;
+      items.forEach((i, n) => {
+        out[i] = [x + (n % w + .5) * G_CW, (Math.floor(n / w) + .5) * G_RH, 0];
       });
-      cols.push({ key: m, label: m, color: META.mcol[m], x: x + bw / 2, halfW: bw / 2,
-                  top: GRID_TOP, bottom: GRID_TOP + Math.ceil(items.length / w[gi]) * G_RH, items });
+      cols.push({ key: k, label: k, color: G.col(k), x: x + bw / 2, halfW: bw / 2,
+                  top: 0, bottom: Math.ceil(items.length / w) * G_RH, items: items });
       x += bw + G_GAP;
     });
   }
 
   else if (view === 'clusters'){
-    const g = {}; META.places.forEach(p => g[p] = []);
-    ord.forEach(i => g[DATA[i].place].push(i));
-    META.places.forEach(p => {
-      const items = g[p], at = META.placeAt[p];
-      const c = Math.max(1, Math.ceil(Math.sqrt(items.length * 1.25)));
-      const r = Math.ceil(items.length / c);
-      items.forEach((i, k) => {
-        out[i] = [at[0] + (k % c - (c - 1) / 2) * CL_CW,
-                  at[1] + (Math.floor(k / c) - (r - 1) / 2) * CL_RH, 0];
-      });
-      cols.push({ key: p, label: p, color: null, x: at[0], halfW: c * CL_CW / 2,
-                  top: at[1] - r * CL_RH / 2, bottom: at[1] + r * CL_RH / 2, items });
+    /* the same groups, but loose — shelved three across and centred */
+    const g = {}; G.keys.forEach(k => g[k] = []);
+    ord.forEach(i => g[G.of(i)].push(i));
+    const live = G.keys.filter(k => g[k].length);
+    const per = live.length <= 3 ? live.length : 3;
+    const blocks = live.map(k => {
+      const n = g[k].length, c = Math.max(1, Math.ceil(Math.sqrt(n * 1.3)));
+      return { k: k, items: g[k], c: c, r: Math.ceil(n / c), w: c * CL_CW, h: Math.ceil(n / c) * CL_RH };
     });
+    let y = 0;
+    for (let row = 0; row < Math.ceil(blocks.length / per); row++){
+      const line = blocks.slice(row * per, row * per + per);
+      const lineW = line.reduce((a, b) => a + b.w, 0) + (line.length - 1) * CL_GAP;
+      const lineH = Math.max.apply(null, line.map(b => b.h));
+      let x = -lineW / 2;
+      line.forEach(b => {
+        /* hang every island from the row's top line, so the whole row's names
+           sit on one line and none of them lands inside the block above */
+        const cx = x + b.w / 2, cy = y + b.h / 2;
+        b.items.forEach((i, n) => {
+          out[i] = [cx + (n % b.c - (b.c - 1) / 2) * CL_CW,
+                    cy + (Math.floor(n / b.c) - (b.r - 1) / 2) * CL_RH, 0];
+        });
+        cols.push({ key: b.k, label: b.k, color: G.col(b.k), x: cx, halfW: b.w / 2,
+                    top: cy - b.h / 2, bottom: cy + b.h / 2, items: b.items });
+        x += b.w + CL_GAP;
+      });
+      y += lineH + CL_VGAP;          /* room for the next row's names */
+    }
   }
 
-  else {                                        /* sphere: round is the order, poles are how often */
+  else {                                      /* sphere: round is the order, poles are how often */
     ord.forEach((i, k) => {
       const lon = (k / N) * Math.PI * 2;
-      const y = (fnorm(DATA[i]) - .5) * 1.76;   /* seen every day rides the top pole */
+      const y = (fnorm(DATA[i]) - .5) * 1.76;
       const r = Math.sqrt(Math.max(0, 1 - y * y));
-      out[i] = [Math.cos(lon) * r, y, Math.sin(lon) * r];   /* unit — scaled at paint time */
+      out[i] = [Math.cos(lon) * r, y, Math.sin(lon) * r];       /* unit — scaled at paint */
     });
     return { pos: out, columns: cols };
   }
 
-  /* every flat view is centred on what it actually occupies, so a shape built
-     around fixed anchors (the clusters hang off their map, the grid hangs off
-     a top line) still sits in the middle of the room it is given */
+  /* every flat view is centred on what it actually occupies */
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   out.forEach(p => { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
                      if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; });
   const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
   out.forEach(p => { p[0] -= mx; p[1] -= my; });
   cols.forEach(c => { c.x -= mx; c.top -= my; c.bottom -= my; });
-  return { pos: out, columns: cols };
+  return { pos: out, columns: cols, ext: [x1 - x0, y1 - y0] };
 }
 
 /* ================================================================== */
@@ -177,41 +190,28 @@ function mount(opts){
   const world = opts.world, cv = opts.wire, ctx = cv.getContext('2d');
   const fl = opts.floor, fx = fl.getContext('2d');
   const thumbBase = opts.thumbBase || '../assets/thumb/';
+  const SR = META.sphereR;
 
   let view = opts.view || 'sphere', sort = opts.sort || 'colour';
-  let focal = 1400, dist = VIEWS[view].dist, camX = 0, camY = 0;
-  let yaw = .5, pitch = -.2, spinRate = 0, spinning = false;
-  let spread = 1, threads = 1, sphereR = META.sphereR;
+  const focal = 1400;
+  let dist = 6000, camX = 0, camY = 0, scrollX = 0, userZoom = false;
+  let yaw = .5, pitch = -.2, motion = opts.motion == null ? .35 : opts.motion, running = false;
   let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false;
   let animating = false, anim = null, locked = !!opts.locked;
   let hot = -1, pinned = -1, hotLine = -1, hotCol = null, downIdx = -1, downFace = null;
-  let guideCol = null, colOf = new Array(N);   /* which column each picture sits in */
-  let only = null, lit = null;                   /* lit = a meaning lifted without filtering */
-  const freqOn = new Set([0, 1, 2]);
-  const kindOn = new Set(['meaning']);
+  let only = null, lit = null, guideCol = null;
   const inset = { left: 0, right: 0, top: 0, bottom: 0 };
-  let columns = [], P = [], segs = [];
+  let columns = [], colOf = new Array(N), P = [], segs = [];
 
-  /* edges get a stable rank once, so the Threads slider thins them evenly */
-  const eRank = META.edges.map((_, k) => ((k * 2654435761) % 1000) / 1000);
-
+  /* only meaning ties one picture to another — same rule as index.html */
+  const EDGES = META.edges.filter(e => e[2] === 'meaning');
   const ADJ = DATA.map(() => []);
-  META.edges.forEach(([a, b, kind, ma, mb]) => {
-    ADJ[a].push([b, kind, ma, mb]); ADJ[b].push([a, kind, mb, ma]);
-  });
+  EDGES.forEach(e => { ADJ[e[0]].push([e[1], e[3], e[4]]); ADJ[e[1]].push([e[0], e[4], e[3]]); });
   const hasMeaning = (i, m) => DATA[i].means.indexOf(m) >= 0;
-  const live = i => (!only || hasMeaning(i, only)) && freqOn.has(DATA[i].fb);
-  function edgeOk(a, b, kind, ma, mb){
-    if (!kindOn.has(kind)) return false;
-    if (!freqOn.has(DATA[a].fb) || !freqOn.has(DATA[b].fb)) return false;
-    if (only){
-      const t = kind === 'meaning' ? (ma === only || mb === only)
-                                   : (hasMeaning(a, only) || hasMeaning(b, only));
-      if (!t) return false;
-    }
-    return true;
-  }
-  const linksOf = i => ADJ[i].filter(l => edgeOk(i, l[0], l[1], l[2], l[3]));
+  /* one meaning chosen: that meaning's pictures, and the ties between them */
+  const live = i => !only || hasMeaning(i, only);
+  const edgeOk = (a, b, ma, mb) => !only || (ma === only && mb === only);
+  const linksOf = i => ADJ[i].filter(l => edgeOk(i, l[0], l[1], l[2]));
 
   /* ---------- placing ---------- */
   function rot(u){
@@ -221,26 +221,47 @@ function mount(opts){
     return [x, u[1] * cp - z1 * sp, u[1] * sp + z1 * cp];
   }
   let raw = layout(view, sort);
-  const scaled = () => view === 'sphere'
-    ? raw.pos.map(u => { const r = rot(u), R = sphereR * spread; return [r[0] * R, r[1] * R, r[2] * R]; })
-    : raw.pos.map(p => [p[0] * spread, p[1] * spread, p[2]]);
-  let pos = scaled();
-  columns = raw.columns;
-  columns.forEach(c => c.items.forEach(i => colOf[i] = c.key));
+
+  /* the field frames itself into whatever room the panel has left it, so no
+     zoom control is needed and every view/sort pairing arrives readable */
+  function fit(){
+    if (userZoom) return;
+    const halfW = (innerWidth - inset.left - inset.right) / 2 - 34;
+    const halfH = innerHeight / 2 - 54;   /* room for the column names above */
+    let s;
+    if (view === 'timeline') s = .23;                      /* a fixed, comfortable tile */
+    else if (view === 'sphere') s = Math.min(halfW, halfH) / (SR + TILE * .42);
+    else {
+      const e = raw.ext || [4000, 4000];
+      s = Math.min(halfW / (e[0] / 2 + TILE * .5), halfH / (e[1] / 2 + TILE * .45));
+    }
+    dist = Math.max(1600, Math.min(26000, focal / s));
+  }
+  function wrap(x){
+    const W = raw.loopW;
+    return ((x + W / 2) % W + W) % W - W / 2;
+  }
+  const scaled = () =>
+    view === 'sphere' ? raw.pos.map(u => { const r = rot(u);
+                                           return [r[0] * SR, r[1] * SR, r[2] * SR]; })
+  : view === 'timeline' ? raw.pos.map(p => [wrap(p[0] - scrollX), p[1], p[2]])
+  : raw.pos.map(p => p.slice());
 
   function relayout(){
-    raw = layout(view, sort); columns = raw.columns;
+    raw = layout(view, sort);
+    columns = raw.columns;
     colOf = new Array(N);
     columns.forEach(c => c.items.forEach(i => colOf[i] = c.key));
+    fit();
   }
+  relayout();
+  let pos = scaled();
 
   /* ---------- holding a picture ---------- */
   function buildFocus(i){
     const ln = linksOf(i), base = scaled(), out = base.map(p => p.slice());
     out[i] = [0, 0, 0];
     const R0 = dist * .26, RING = dist * .115;
-    /* the ring is a constant .26 * focal on screen; widen it only as far as the
-       room actually left beside the panel, or the kin sit under the sidebar */
     const halfW = (innerWidth - inset.left - inset.right) / 2;
     const xMul = Math.max(.92, Math.min(1.45, (halfW - 90) / (.26 * focal)));
     ln.forEach((l, k) => {
@@ -257,10 +278,9 @@ function mount(opts){
     });
     return out;
   }
-  function easeTo(target, T, done){
-    T = T || 700;
+  function tween(target, T, done){
     const from = pos.map(p => p.slice()), t0 = performance.now();
-    cancelAnimationFrame(anim);
+    animating = true; cancelAnimationFrame(anim);
     (function step(now){
       const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
       pos = from.map((p, i) => [p[0] + (target[i][0] - p[0]) * e,
@@ -269,21 +289,19 @@ function mount(opts){
       paint();
       if (u < 1) anim = requestAnimationFrame(step);
     })(t0);
-    setTimeout(() => { pos = done ? done() : target.map(p => p.slice()); paint(); }, T + 60);
+    setTimeout(() => { animating = false; pos = done ? done() : target.map(p => p.slice()); paint(); }, T + 60);
   }
   function hold(i){
     if (locked) return;
     pinned = i; camX = camY = 0; hotCol = null;
-    easeTo(buildFocus(i));
+    tween(buildFocus(i), 700);
     if (opts.onHold) opts.onHold(i, linksOf(i));
-    paint();
   }
   function release(){
     if (pinned < 0) return;
     pinned = -1;
-    easeTo(scaled(), 700, scaled);
+    tween(scaled(), 700, scaled);
     if (opts.onRelease) opts.onRelease();
-    paint();
   }
 
   /* ---------- pictures ---------- */
@@ -328,11 +346,6 @@ function mount(opts){
     g.addColorStop(0, rgba(ca, alpha)); g.addColorStop(1, rgba(cb, alpha));
     return g;
   }
-  function edgeColor(a, b, kind, ma, mb){
-    if (kind === 'meaning') return [META.mcol[ma], META.mcol[mb]];
-    if (kind === 'color')   return [DATA[a].hex, DATA[b].hex];
-    return [META.kindColor[kind], META.kindColor[kind]];
-  }
   const last = new Map();
   function put(el, k, v){
     const key = el.__i + ':' + k;
@@ -341,7 +354,7 @@ function mount(opts){
   }
   function arcPts(ia, ib, steps){
     steps = steps || 14;
-    const a = rot(raw.pos[ia]), b = rot(raw.pos[ib]), R = sphereR * spread;
+    const a = rot(raw.pos[ia]), b = rot(raw.pos[ib]);
     const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
     const om = Math.acos(dot), so = Math.sin(om), pts = []; let zs = 0;
     for (let k = 0; k <= steps; k++){
@@ -349,7 +362,7 @@ function mount(opts){
       const s1 = so < 1e-4 ? 1 - t : Math.sin((1 - t) * om) / so;
       const s2 = so < 1e-4 ? t : Math.sin(t * om) / so;
       const x = a[0] * s1 + b[0] * s2, y = a[1] * s1 + b[1] * s2, z = a[2] * s1 + b[2] * s2;
-      const q = project(x * R, y * R, z * R);
+      const q = project(x * SR, y * SR, z * SR);
       if (!q) return null;
       pts.push(q); zs += z;
     }
@@ -375,44 +388,23 @@ function mount(opts){
     c.stroke();
   }
 
-  /* ---------- the guides underneath ----------
-     The structure a view is built on, drawn as plain rules so the
-     arrangement is readable even before a single thread is followed. */
+  /* ---------- the guides underneath ---------- */
   function paintFloor(){
     const dpr = Math.min(2, devicePixelRatio || 1);
     if (fl.width !== innerWidth * dpr){ fl.width = innerWidth * dpr; fl.height = innerHeight * dpr; }
     fl.style.width = innerWidth + 'px'; fl.style.height = innerHeight + 'px';
     fx.setTransform(dpr, 0, 0, dpr, 0, 0);
     fx.clearRect(0, 0, innerWidth, innerHeight);
-    if (view === 'sphere' || pinned >= 0 || animating) return;
-
+    if (!columns.length || pinned >= 0 || animating) return;
     columns.forEach(c => {
       const on = guideCol === c.key;
-      const a = project((c.x - c.halfW) * spread, c.top * spread, 0);
-      const b = project((c.x + c.halfW) * spread, c.bottom * spread, 0);
+      const a = project(c.x - c.halfW, c.top, 0), b = project(c.x + c.halfW, c.bottom, 0);
       if (!a || !b) return;
       fx.lineWidth = 1;
-      fx.strokeStyle = c.color ? rgba(c.color, on ? .5 : .14)
-                               : 'rgba(255,255,255,' + (on ? .2 : .07) + ')';
-      if (view === 'timeline'){
-        fx.beginPath(); fx.moveTo(a.x, a.y); fx.lineTo(a.x, b.y); fx.stroke();
-      } else {
-        fx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
-        if (on){ fx.fillStyle = c.color ? rgba(c.color, .07) : 'rgba(255,255,255,.04)';
-                 fx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); }
-      }
+      fx.strokeStyle = rgba(c.color, on ? .5 : .15);
+      fx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      if (on){ fx.fillStyle = rgba(c.color, .07); fx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); }
     });
-
-    /* the timeline carries its own key: a bar of the sorted-by colour
-       under each picture, so the order is legible as a stripe */
-    if (view === 'timeline'){
-      DATA.forEach((d, i) => {
-        const p = P[i]; if (!p || !live(i)) return;
-        const w = TILE * p.s * .8, h = Math.max(2, 7 * p.s * 4);
-        fx.fillStyle = rgba(sortColour(i, sort), .85);
-        fx.fillRect(p.x - w / 2, p.y + TILE * p.s * .42, w, h);
-      });
-    }
   }
 
   /* ---------- draw ---------- */
@@ -425,7 +417,7 @@ function mount(opts){
 
     P = pos.map(p => project(p[0], p[1], p[2]));
     const focusI = pinned >= 0 ? pinned : hot;
-    const ln = focusI >= 0 ? linksOf(focusI) : [];
+    const ln = focusI >= 0 && live(focusI) ? linksOf(focusI) : [];
     const kin = new Set(ln.map(l => l[0]));
     const globe = view === 'sphere' && pinned < 0 && !animating;
     const shrink = view === 'sphere' && pinned < 0 ? .72 : 1;
@@ -433,7 +425,9 @@ function mount(opts){
     guideCol = hotCol || (focusI >= 0 ? colOf[focusI] || null : null);
 
     DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
-      const p = P[i], el = nodes[i], held = i === pinned;
+      const p = P[i], el = nodes[i], held = i === pinned, gone = !live(i);
+      el.classList.toggle('mute', gone);
+      if (gone){ put(el, 'opacity', '0'); return; }
       const far = globe && pos[i][2] > 0;
       const big = i === focusI ? 1.25 + .75 * (DATA[i].deg / META.maxdeg) : 1;
       let w = TILE * p.s * big * shrink, h = w * .8;
@@ -449,13 +443,11 @@ function mount(opts){
       el.classList.toggle('flip', flip);
       if (flip) fillBack(el, i, ln);
 
-      let op;
-      if (!live(i)) op = .08;
-      else if (focusI >= 0) op = i === focusI ? 1 : kin.has(i) ? .95 : far ? .1 : .24;
-      else if (colSet) op = colSet.has(i) ? 1 : .2;
-      else if (lit) op = hasMeaning(i, lit) ? 1 : .18;
-      else op = far ? .3 : 1;
-      put(el, 'opacity', String(op));
+      put(el, 'opacity', String(
+        focusI >= 0 ? (i === focusI ? 1 : kin.has(i) ? .95 : far ? .1 : .24)
+      : colSet ? (colSet.has(i) ? 1 : .2)
+      : lit ? (hasMeaning(i, lit) ? 1 : .18)
+      : far ? .3 : 1));
 
       /* NEVER negative. A child with a negative z-index paints behind its own
          positioned parent, which would put #world on top of every picture and
@@ -466,20 +458,21 @@ function mount(opts){
 
     paintFloor();
 
-    /* the resting threads — the meanings of the grids, drawn as colour */
+    /* the resting threads — quiet, but the field is never empty */
     ctx.lineWidth = 1.4;
-    META.edges.forEach((e, k) => {
-      if (eRank[k] > threads) return;
-      const a = e[0], b = e[1], kind = e[2], ma = e[3], mb = e[4];
-      if (!edgeOk(a, b, kind, ma, mb)) return;
+    EDGES.forEach(e => {
+      const a = e[0], b = e[1], ma = e[3], mb = e[4];
+      if (!edgeOk(a, b, ma, mb) || !live(a) || !live(b)) return;
       let pts;
       if (globe){ pts = arcPts(a, b); if (!pts) return; }
-      else { if (!P[a] || !P[b]) return; pts = [P[a], P[b]]; }
-      let base = (focusI < 0 ? .34 : .07) * (kind === 'meaning' ? 1 : .8);
+      else { if (!P[a] || !P[b]) return;
+             if (view === 'timeline' && Math.abs(P[a].x - P[b].x) > innerWidth * 1.1) return;
+             pts = [P[a], P[b]]; }
+      let base = focusI < 0 ? .34 : .07;
       if (lit && focusI < 0) base = (ma === lit || mb === lit) ? .75 : .05;
       if (colSet && focusI < 0) base = (colSet.has(a) || colSet.has(b)) ? .6 : .05;
-      const cc = edgeColor(a, b, kind, ma, mb);
-      ctx.strokeStyle = grad(pts[0], pts[pts.length - 1], cc[0], cc[1], pts.back ? base * .3 : base);
+      ctx.strokeStyle = grad(pts[0], pts[pts.length - 1], META.mcol[ma], META.mcol[mb],
+                             pts.back ? base * .3 : base);
       drawPoly(ctx, pts);
     });
 
@@ -493,11 +486,12 @@ function mount(opts){
         if (pinned >= 0) pts = fanPts(P[focusI], P[j], k);
         else if (globe) pts = arcPts(focusI, j) || [P[focusI], P[j]];
         else pts = [P[focusI], P[j]];
-        segs.push({ pts: pts, j: j, kind: l[1], ma: l[2], mb: l[3], b: P[j] });
+        segs.push({ pts: pts, j: j, ma: l[1], mb: l[2], b: P[j] });
       });
       segs.forEach((sg, k) => {
-        const on = k === hotLine, cc = edgeColor(focusI, sg.j, sg.kind, sg.ma, sg.mb);
-        ctx.strokeStyle = on ? GOLD : grad(sg.pts[0], sg.pts[sg.pts.length - 1], cc[0], cc[1], .9);
+        const on = k === hotLine;
+        ctx.strokeStyle = on ? GOLD
+          : grad(sg.pts[0], sg.pts[sg.pts.length - 1], META.mcol[sg.ma], META.mcol[sg.mb], .9);
         ctx.lineWidth = on ? 3.4 : 2;
         drawPoly(ctx, sg.pts);
       });
@@ -516,21 +510,21 @@ function mount(opts){
     const dim = focusI < 0 ? 1 : .3;
     colLabels.forEach((el, k) => {
       const c = columns[k];
-      if (!c || !c.label || view === 'sphere' || animating || pinned >= 0){ el.style.opacity = 0; return; }
-      const q = project(c.x * spread, (c.top - 330) * spread, 0);   /* clear of the block above */
+      if (!c || animating || pinned >= 0){ el.style.opacity = 0; return; }
+      const q = project(c.x, c.top, 0);
       if (!q){ el.style.opacity = 0; return; }
       el.textContent = c.label;
-      el.style.transform = 'translate(' + q.x + 'px,' + q.y + 'px) translate(-50%,-50%)';
+      /* a fixed distance above the block ON SCREEN, not in the world — a tall
+         group would otherwise push its own name off the top of the window */
+      el.style.transform = 'translate(' + q.x + 'px,' + (q.y - 22) + 'px) translate(-50%,-50%)';
       el.style.fontSize = Math.max(9, Math.min(15, 11 * q.s * 1.5)) + 'px';
-      el.style.color = c.color && guideCol === c.key ? c.color : '';
+      el.style.color = guideCol === c.key ? c.color : '';
       el.classList.toggle('lit', guideCol === c.key);
       el.style.opacity = (hotCol && hotCol !== c.key ? .25 : .85) * dim;
     });
     poleLabels.forEach(o => {
       if (!globe){ o.el.style.opacity = 0; return; }
-      /* 1.05, not 1.16: the poles are what the sphere is sorted by, and they are
-         no use to anyone sitting just past the top and bottom of the window */
-      const r = rot(o.u), R = sphereR * spread * 1.05, q = project(r[0] * R, r[1] * R, r[2] * R);
+      const r = rot(o.u), R = SR * 1.05, q = project(r[0] * R, r[1] * R, r[2] * R);
       if (!q){ o.el.style.opacity = 0; return; }
       o.el.style.transform = 'translate(' + q.x + 'px,' + q.y + 'px) translate(-50%,-50%)';
       o.el.style.fontSize = '11px';
@@ -549,20 +543,17 @@ function mount(opts){
            (stops.length ? 'conic-gradient(' + stops.join(',') + ')' : '#ddd') + '"></div>';
   }
   function fillBack(el, i, ln){
-    const d = DATA[i], by = {}, ord2 = [];
+    const d = DATA[i], by = {}, keys = [];
     ln.forEach(l => {
-      const kind = l[1], mb = l[3];
-      const key = kind === 'meaning' ? mb : kind;
-      const label = kind === 'meaning' ? mb : META.kindLabel[kind];
-      const color = kind === 'meaning' ? META.mcol[mb] : (kind === 'color' ? d.hex : META.kindColor[kind]);
-      if (!by[key]){ by[key] = { n: 0, label: label, color: color }; ord2.push(key); }
-      by[key].n++;
+      const m = l[2];
+      if (!by[m]){ by[m] = { n: 0, color: META.mcol[m] }; keys.push(m); }
+      by[m].n++;
     });
-    ord2.sort((a, b) => by[b].n - by[a].n);
-    const max = ord2.length ? by[ord2[0]].n : 1;
-    const bars = ord2.map(k => {
+    keys.sort((a, b) => by[b].n - by[a].n);
+    const max = keys.length ? by[keys[0]].n : 1;
+    const bars = keys.map(k => {
       const r = by[k];
-      return '<div class="brow"><i style="background:' + r.color + '"></i><u>' + r.label + '</u>' +
+      return '<div class="brow"><i style="background:' + r.color + '"></i><u>' + k + '</u>' +
         '<div class="btrack"><div class="bfill" style="width:' + Math.round(r.n / max * 100) +
         '%;background:' + r.color + '"></div></div><b>' + r.n + '</b></div>';
     }).join('');
@@ -573,7 +564,7 @@ function mount(opts){
       '<div class="r"><span>Found in</span><b>' + d.place + '</b></div>' +
       '<div class="r"><span>Colour</span><b>' + familyOf(d) + '</b></div>' +
       '<div class="r"><span>Seen</span><b>' + META.freqBuckets[d.fb] + '</b></div>' +
-      '<div class="pie">' + (ln.length ? donut(ord2.map(k => [by[k].color, by[k].n]), ln.length, 56) : '') +
+      '<div class="pie">' + (ln.length ? donut(keys.map(k => [by[k].color, by[k].n]), ln.length, 56) : '') +
       '<div class="pien"><b>' + ln.length + '</b><span>joined</span></div></div>' +
       '<div class="k">' + (bars || '<span style="color:#8b8779;font-size:12px">nothing else shares this yet</span>') + '</div>';
   }
@@ -595,18 +586,15 @@ function mount(opts){
     return best;
   }
   function colAt(mx, my){
-    if (view === 'sphere' || pinned >= 0 || animating) return null;
+    if (!columns.length || pinned >= 0 || animating) return null;
     for (let k = 0; k < columns.length; k++){
       const c = columns[k];
-      const a = project((c.x - c.halfW) * spread, c.top * spread, 0);
-      const b = project((c.x + c.halfW) * spread, c.bottom * spread, 0);
+      const a = project(c.x - c.halfW, c.top, 0), b = project(c.x + c.halfW, c.bottom, 0);
       if (!a || !b) continue;
-      const pad = view === 'timeline' ? 0 : 10;
-      if (mx < a.x - pad || mx > b.x + pad) continue;
-      /* grid and timeline columns are full-height strips — you should be able to
-         pick one anywhere down its length, not only where the pictures happen to be */
-      if (view !== 'clusters') return c.key;
-      if (my >= a.y - 40 && my <= b.y + pad) return c.key;
+      if (mx < a.x - 10 || mx > b.x + 10) continue;
+      /* grid columns are full-height strips: pick one anywhere down its length */
+      if (view === 'grid') return c.key;
+      if (my >= a.y - 42 && my <= b.y + 10) return c.key;
     }
     return null;
   }
@@ -623,8 +611,8 @@ function mount(opts){
     drag = false; document.body.classList.remove('drag');
     if (moved || inChrome(e) || locked) return;
     if (downFace === 'back'){ release(); return; }
-    /* trust the live hover over whatever was under the first pixel — growth
-       on hover moves a picture's box between mousedown and mouseup */
+    /* trust the live hover over whatever was under the first pixel — growth on
+       hover moves a picture's box between mousedown and mouseup */
     const target = hot >= 0 ? hot : downIdx;
     if (target >= 0){ pinned === target ? release() : hold(target); return; }
     if (hotLine >= 0 && segs[hotLine]){
@@ -639,14 +627,16 @@ function mount(opts){
       const dx = e.clientX - lx, dy = e.clientY - ly;
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) moved = true;
       lx = e.clientX; ly = e.clientY;
+      const s = focal / dist;
       if (view === 'sphere' && pinned < 0 && !animating){
         yaw += dx * .005;
         pitch = Math.max(-1.25, Math.min(1.25, pitch + dy * .004));
         pos = scaled();
-      } else {
-        const s = focal / dist;
-        camX -= dx / s; camY -= dy / s;
-      }
+      } else if (view === 'timeline' && pinned < 0 && !animating){
+        scrollX -= dx / s;                    /* scrub the strip by hand */
+        camY -= dy / s;
+        pos = scaled();
+      } else { camX -= dx / s; camY -= dy / s; }
       paint();
       return;
     }
@@ -665,83 +655,50 @@ function mount(opts){
   addEventListener('wheel', e => {
     if (inChrome(e)) return;
     e.preventDefault();
-    dist = Math.max(700, Math.min(14000, dist * (e.deltaY > 0 ? 1.075 : .93)));
-    if (opts.onZoom) opts.onZoom(dist);
+    userZoom = true;
+    dist = Math.max(900, Math.min(26000, dist * (e.deltaY > 0 ? 1.075 : .93)));
     paint();
   }, { passive: false });
-  addEventListener('resize', paint);
+  addEventListener('resize', () => { fit(); paint(); });
 
-  /* ---------- the slow turn behind a cover ---------- */
-  function spinFrame(){
-    if (!spinning) return;
-    if (view === 'sphere' && pinned < 0 && !drag && !animating){
-      yaw += spinRate; pos = scaled(); paint();
+  /* ---------- the motion a view has of its own ---------- */
+  function frame(){
+    if (!running) return;
+    if (pinned < 0 && !drag && !animating && motion > 0){
+      if (view === 'sphere'){ yaw += motion * .0045; pos = scaled(); paint(); }
+      else if (view === 'timeline'){ scrollX += motion * 16; pos = scaled(); paint(); }
     }
-    requestAnimationFrame(spinFrame);
+    requestAnimationFrame(frame);
   }
+  const wake = () => { if (!running){ running = true; requestAnimationFrame(frame); } };
 
   /* ---------- moving between views ---------- */
-  function goTo(v, keepDist){
-    const wasSphere = view === 'sphere';
-    view = v;
-    if (!keepDist) dist = VIEWS[v].dist;
-    camX = camY = 0; pinned = -1; hotCol = null;
+  function goTo(v){
+    view = v; camX = camY = 0; pinned = -1; hotCol = null; userZoom = false;
+    if (v === 'timeline') scrollX = 0;
     relayout();
-    const to = scaled();
-    if (wasSphere !== (v === 'sphere')) { /* the shape changes completely — still tween */ }
-    const from = pos.map(p => p.slice()), t0 = performance.now(), T = 950;
-    animating = true; cancelAnimationFrame(anim);
-    (function step(now){
-      const u = Math.min(1, (now - t0) / T);
-      const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-      pos = from.map((p, i) => [p[0] + (to[i][0] - p[0]) * e, p[1] + (to[i][1] - p[1]) * e,
-                                p[2] + (to[i][2] - p[2]) * e]);
-      paint();
-      if (u < 1) anim = requestAnimationFrame(step);
-    })(t0);
-    setTimeout(() => { animating = false; pos = scaled(); paint(); }, T + 60);
+    tween(scaled(), 950, scaled);
+    wake();
     if (opts.onView) opts.onView(v);
   }
   function reSort(s){
-    sort = s; relayout();
-    const to = scaled(), from = pos.map(p => p.slice()), t0 = performance.now(), T = 820;
-    animating = true; cancelAnimationFrame(anim);
-    (function step(now){
-      const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
-      pos = from.map((p, i) => [p[0] + (to[i][0] - p[0]) * e, p[1] + (to[i][1] - p[1]) * e,
-                                p[2] + (to[i][2] - p[2]) * e]);
-      paint();
-      if (u < 1) anim = requestAnimationFrame(step);
-    })(t0);
-    setTimeout(() => { animating = false; pos = scaled(); paint(); }, T + 60);
+    sort = s; pinned = -1; hotCol = null; userZoom = false;
+    relayout();
+    tween(scaled(), 820, scaled);
+    if (opts.onSort) opts.onSort(s);
   }
 
   const api = {
-    VIEWS: VIEWS, VIEW_ORDER: VIEW_ORDER, SORTS: SORTS, SORT_ORDER: SORT_ORDER,
-    SORT_NOTE: SORT_NOTE, ICON: ICON,
-    get view(){ return view; }, get sort(){ return sort; }, get dist(){ return dist; },
-    get only(){ return only; }, get pinned(){ return pinned; },
+    get view(){ return view; }, get sort(){ return sort; },
+    get only(){ return only; }, get pinned(){ return pinned; }, get motion(){ return motion; },
     goTo: goTo, reSort: reSort, paint: paint, hold: hold, release: release,
-    setOnly(m){ only = m; paint(); },
+    setOnly(m){ only = m; if (pinned >= 0 && !live(pinned)) pinned = -1; paint(); },
     setLit(m){ lit = m; paint(); },
-    setColumn(k){ hotCol = k; paint(); },
-    columnKeys(){ return columns.map(c => c.key).filter(Boolean); },
-    toggleFreq(k){ freqOn.has(k) ? (freqOn.size > 1 && freqOn.delete(k)) : freqOn.add(k); paint(); },
-    hasFreq(k){ return freqOn.has(k); },
-    toggleKind(k){ kindOn.has(k) ? (kindOn.size > 1 && kindOn.delete(k)) : kindOn.add(k); paint(); },
-    hasKind(k){ return kindOn.has(k); },
-    reset(){ only = null; lit = null; [0,1,2].forEach(k => freqOn.add(k));
-             kindOn.clear(); kindOn.add('meaning'); threads = 1; paint(); },
-    setZoom(t){ dist = 12500 - t * 9200; paint(); },          /* t 0..1, near at 1 */
-    zoomT(){ return Math.max(0, Math.min(1, (12500 - dist) / 9200)); },
-    setSpread(v){ spread = v; pos = scaled(); paint(); },
-    setThreads(v){ threads = v; paint(); },
-    setTurn(v){ yaw = v * Math.PI * 2; pos = scaled(); paint(); },
-    turnT(){ return (yaw / (Math.PI * 2)) % 1; },
+    setMotion(v){ motion = v; if (v > 0) wake(); paint(); },
+    hasMotion(){ return view === 'sphere' || view === 'timeline'; },
+    reset(){ only = null; lit = null; paint(); },
     setLocked(v){ locked = v; if (v){ pinned = -1; hotCol = null; } },
-    spin(rate){ spinRate = rate; if (rate && !spinning){ spinning = true; spinFrame(); }
-                if (!rate) spinning = false; },
-    setInset(o){ Object.assign(inset, o); paint(); },
+    setInset(o){ Object.assign(inset, o); fit(); paint(); },
     ready(cb){
       let n = 0;
       const imgs = world.querySelectorAll('img');
@@ -750,6 +707,7 @@ function mount(opts){
       if (!imgs.length) cb();
     }
   };
+  wake();
   paint();
   return api;
 }

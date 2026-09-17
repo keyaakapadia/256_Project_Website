@@ -10,42 +10,65 @@
   #veil{position:fixed;inset:0;z-index:41000;background:var(--bg);transition:opacity .7s ease}
   #veil.gone{opacity:0;pointer-events:none}
 
-  #box{position:fixed;left:26px;bottom:26px;width:440px;z-index:19500;
-       padding:16px 16px 14px;border-radius:11px;overflow:hidden;
-       transition:left .78s cubic-bezier(.3,.8,.25,1),top .78s cubic-bezier(.3,.8,.25,1),
-                  width .78s cubic-bezier(.3,.8,.25,1),height .78s cubic-bezier(.3,.8,.25,1),
-                  padding .78s ease,border-radius .78s ease,box-shadow .78s ease,
-       opacity .7s ease,transform .7s ease;
-       opacity:0;transform:translateY(16px)}
+  /* where it is going, shown before it goes */
+  #rail{position:fixed;left:0;top:0;bottom:0;width:330px;z-index:19400;pointer-events:none;
+        background:linear-gradient(90deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+        border-right:1px dashed rgba(255,255,255,.26);opacity:0;
+        transform:translateX(-14px);
+        transition:opacity .3s ease,transform .3s cubic-bezier(.3,.85,.25,1)}
+  #rail.on{opacity:1;transform:none}
+  /* high up, where the card in the corner is not already covering it */
+  #rail span{position:absolute;left:0;right:0;top:15%;text-align:center;font-size:10px;
+             letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.42)}
+
+  #box{position:fixed;left:26px;bottom:26px;width:446px;z-index:19500;
+       padding:17px 17px 15px;border-radius:12px;overflow:hidden;
+       opacity:0;transform:translateY(16px);
+       /* going back: unfold down first, then walk to the corner */
+       transition:height .44s cubic-bezier(.3,.85,.25,1),
+                  top .44s cubic-bezier(.3,.85,.25,1),
+                  left .58s cubic-bezier(.34,.9,.3,1) .22s,
+                  width .58s cubic-bezier(.34,.9,.3,1) .22s,
+                  padding .5s ease,border-radius .5s ease .22s,
+                  box-shadow .6s ease,opacity .7s ease,transform .7s ease}
   #box.up{opacity:1;transform:none}
 
-  /* the snap: same element, new home */
+  /* the snap: the same element walks to the edge, then unfolds */
   #box.open{left:0!important;top:0!important;width:330px!important;height:100vh!important;
-            padding:22px 18px 28px!important;border-radius:0 16px 16px 0!important;
+            padding:22px 18px 28px!important;border-radius:0 18px 18px 0!important;
             overflow-y:auto;border-width:0 1px 0 0;
-            box-shadow:18px 0 50px rgba(0,0,0,.45)!important}
+            box-shadow:22px 0 60px rgba(0,0,0,.5)!important;
+            transition:left .58s cubic-bezier(.34,.9,.3,1),
+                       width .58s cubic-bezier(.34,.9,.3,1),
+                       border-radius .5s ease,
+                       top .62s cubic-bezier(.3,.85,.25,1) .26s,
+                       height .62s cubic-bezier(.3,.85,.25,1) .26s,
+                       padding .5s ease .26s,
+                       box-shadow .6s ease}
   #box::-webkit-scrollbar{width:7px}
   #box::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
 
   #bhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
-         margin-bottom:14px}
-  #snapback{padding:5px 9px;font-size:11px;border-radius:5px;color:var(--soft);
+         margin-bottom:15px}
+  #snapback{padding:6px 11px;font-size:11px;border-radius:6px;color:var(--soft);
             opacity:0;pointer-events:none;transition:opacity .4s ease}
-  #box.open #snapback{opacity:1;pointer-events:auto;transition-delay:.5s}
+  #box.open #snapback{opacity:1;pointer-events:auto;transition-delay:.7s}
 
   /* everything past the first rule waits until you have asked to come in */
   .more{max-height:0;opacity:0;overflow:hidden;
-        transition:max-height .7s cubic-bezier(.3,.8,.25,1),opacity .45s ease}
-  #box.open .more{max-height:1400px;opacity:1;transition-delay:0s,.28s}
+        transition:max-height .7s cubic-bezier(.3,.85,.25,1),opacity .45s ease}
+  #box.open .more{max-height:1400px;opacity:1;transition-delay:.26s,.5s}
 
-  #teaser{margin-top:14px;padding-top:13px;border-top:1px solid var(--edge);
-          display:flex;align-items:center;justify-content:space-between;gap:14px;
-          max-height:70px;opacity:1;overflow:hidden;
-          transition:max-height .5s ease,opacity .3s ease,margin .5s ease,padding .5s ease}
+  #teaser{margin-top:15px;padding-top:14px;border-top:1px solid var(--edge);
+          display:flex;align-items:center;justify-content:space-between;gap:16px;
+          max-height:76px;opacity:1;overflow:hidden;
+          transition:max-height .45s ease,opacity .25s ease,margin .45s ease,padding .45s ease}
   #box.open #teaser{max-height:0;opacity:0;margin-top:0;padding-top:0;border-color:transparent}
-  #teaser p{margin:0;font-size:11.5px;color:var(--soft);line-height:1.45}
-  #explore{flex:none;padding:10px 20px;font-size:13px;border-radius:6px;
-           border-color:rgba(255,255,255,.34)}
+  #teaser p{margin:0;font-size:11.5px;color:var(--soft);line-height:1.5}
+  #explore{flex:none;display:flex;align-items:center;gap:9px;padding:11px 20px;font-size:13px;
+           border-radius:7px;border-color:rgba(255,255,255,.34)}
+  #explore i{font-style:normal;transition:transform .25s cubic-bezier(.3,.85,.25,1)}
+  #explore:hover i{transform:translateX(-4px)}
 
   #readout{margin-top:16px;padding-top:13px;border-top:1px solid var(--edge);
            font-size:11px;color:var(--soft);line-height:1.5;min-height:32px}
@@ -58,15 +81,17 @@
 <div id="world"></div>
 <canvas id="wire"></canvas>
 
+<div id="rail"><span>the panel goes here</span></div>
+
 <div id="box" class="panel chrome">
   <div id="bhead">
     <div class="mark"><b>Loom</b><span>image mapping tool</span></div>
-    <button class="btn" id="snapback">Shrink</button>
+    <button class="btn" id="snapback">&larr; Shrink</button>
   </div>
   <div id="controls"></div>
   <div id="teaser">
-    <p>Pick a view and an order to get a feel for it.<br>Explore opens the rest and moves the field across.</p>
-    <button class="btn" id="explore">Explore</button>
+    <p>Push a row to change the view or the order.<br>Explore sends this card to the edge and opens the rest.</p>
+    <button class="btn" id="explore"><i>&larr;</i>Explore</button>
   </div>
 </div>
 
@@ -78,10 +103,10 @@
 <script>
 /* ------------------------------------------------------------------
    Draft 2 — the snap.
-   You start with a card in the corner that already works: choose a
-   view, choose an order, watch the field answer. Ask for more and the
-   same card walks to the left edge and unfolds into the full panel,
-   while the field slides across to sit in what is left.
+   You start with a card in the corner that already works. Hovering
+   Explore shows you where it is going; pressing it walks the same card
+   to the left edge, unfolds it into the full panel, and slides the
+   field across into what is left.
 ------------------------------------------------------------------ */
 const SIDE = 330;
 
@@ -89,9 +114,9 @@ const loom = Loom.mount({
   world: document.getElementById('world'),
   wire:  document.getElementById('wire'),
   floor: document.getElementById('floor'),
-  view: 'timeline', sort: 'colour',
+  view: 'timeline', sort: 'colour', motion: .3,
   onView: v => panel.onView(v),
-  onZoom: () => panel.onZoom(),
+  onSort: s => panel.onSort(s),
   onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
   onHold: (i, ln) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
                          ln.length + ' threads out. Click it again to let go.'),
@@ -117,45 +142,52 @@ const say = h => read.innerHTML = h ||
 say('');
 
 /* ---------- the snap ---------- */
-const box = document.getElementById('box');
+const box = document.getElementById('box'), rail = document.getElementById('rail');
 let open = false;
 
 function snapOpen(){
   if (open) return;
   open = true;
-  /* fix the card where it already is, so there is something to animate from */
+  rail.classList.remove('on');
+  /* fix the card where it already is, so there is something to travel from */
   const r = box.getBoundingClientRect();
   box.style.top = r.top + 'px';
   box.style.left = r.left + 'px';
   box.style.width = r.width + 'px';
   box.style.height = r.height + 'px';
   box.style.bottom = 'auto';
-  void box.offsetHeight;                   /* flush the fixed geometry, then move */
+  void box.offsetHeight;                   /* flush that geometry, then move */
   box.classList.add('open');
-  slide(0, SIDE, 780);
+  slide(0, SIDE, 900);
+  setTimeout(() => panel.refresh(), 950);  /* the rows can measure themselves now */
 }
 function snapShut(){
   if (!open) return;
   open = false;
   box.classList.remove('open');
-  slide(SIDE, 0, 780);
+  slide(SIDE, 0, 820);
   setTimeout(() => {                       /* hand the corner back to the stylesheet */
     box.style.top = box.style.left = box.style.width = box.style.height = box.style.bottom = '';
-  }, 820);
+    panel.refresh();
+  }, 880);
 }
-/* the field re-centres into whatever room is left */
+/* the field re-frames into whatever room is left */
 function slide(from, to, T){
   const t0 = performance.now();
-  (function step(now){
+  (function walk(now){
     const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
     loom.setInset({ left: from + (to - from) * e });
-    if (u < 1) requestAnimationFrame(step);
+    if (u < 1) requestAnimationFrame(walk);
   })(t0);
 }
-document.getElementById('explore').onclick = e => { e.stopPropagation(); snapOpen(); };
+const ex = document.getElementById('explore');
+ex.onmouseenter = () => { if (!open) rail.classList.add('on'); };
+ex.onmouseleave = () => rail.classList.remove('on');
+ex.onclick = e => { e.stopPropagation(); snapOpen(); };
 document.getElementById('snapback').onclick = e => { e.stopPropagation(); snapShut(); };
 addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ loom.pinned >= 0 ? loom.release() : snapShut(); }
+  if (e.key !== 'Escape') return;
+  loom.pinned >= 0 ? loom.release() : snapShut();
 });
 
 loom.ready(() => {

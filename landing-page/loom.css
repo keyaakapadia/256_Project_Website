@@ -1,7 +1,8 @@
 /* ------------------------------------------------------------------
    Loom — shared skin for both landing-page drafts.
-   One engine, one set of controls; the drafts differ only in how you
-   are let in.
+
+   Two questions and a key. Everything else was taking attention away
+   from the threads, which are the point.
 ------------------------------------------------------------------ */
 :root{
   --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85;
@@ -18,12 +19,13 @@ body.drag{cursor:grabbing}
 body.overline{cursor:pointer}
 body.cover{cursor:default}
 
-/* ---- the three layers: guides under, pictures between, threads over ---- */
+/* ---- three layers: guides under, pictures between, threads over ---- */
 #floor{position:fixed;inset:0;z-index:0;pointer-events:none}
 #world{position:absolute;inset:0}          /* z-index MUST stay auto — see loom-core.js */
 #wire{position:fixed;inset:0;pointer-events:none;z-index:19000}
 
 .node{position:absolute;will-change:transform;perspective:1600px}
+.node.mute{pointer-events:none}            /* set aside by a meaning — gone, not just faint */
 .card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;
       transition:transform .62s cubic-bezier(.22,.75,.28,1)}
 .node.flip .card{transform:rotateY(180deg)}
@@ -56,12 +58,14 @@ body.cover{cursor:default}
 .pien span{font-size:11px;color:#8b8779;letter-spacing:.06em;text-transform:uppercase}
 
 /* words that live in the space */
-.label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
-       letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;font-size:11px;
-       transition:color .2s}
+/* z-index above the pictures (which top out near 19000 - depth) and below the
+   threads, or a column's name paints underneath the block it belongs to */
+.label{position:absolute;z-index:18800;transform:translate(-50%,-50%);pointer-events:none;
+       color:var(--soft);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;
+       font-size:11px;transition:color .2s}
 .label.lit{color:var(--fg)}
 
-/* ---- controls: pressable reads through outline, fill and weight, never colour ---- */
+/* ---- panels ---- */
 .panel{background:var(--panel);backdrop-filter:blur(18px);border:1px solid var(--edge);
        box-shadow:0 16px 44px rgba(0,0,0,.5)}
 .btn{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--hair);
@@ -69,69 +73,48 @@ body.cover{cursor:default}
      transition:border-color .15s,background .15s,color .15s,opacity .15s}
 .btn:hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
 .btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
-
 .mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
 .mark span{font-size:11px;color:var(--soft)}
-
 .sect{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);
-      margin:0 2px 7px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.sect em{font-style:normal;color:rgba(255,255,255,.4);letter-spacing:.02em;text-transform:none;
-         font-size:10.5px;text-align:right}
+      margin:0 2px 8px}
 
-/* a segmented control — the group carries the affordance, not each button */
-.seg{display:flex;flex-wrap:wrap;gap:2px;padding:3px;background:rgba(255,255,255,.045);
-     border-radius:8px}
-/* flex:1 1 auto + a real min-width so five views WRAP in a narrow sidebar
-   instead of running out past the panel's edge, which is what flex:1 1 0
-   with min-width:0 does the moment the labels stop fitting */
-.seg .btn{flex:1 1 0;min-width:78px;display:flex;align-items:center;justify-content:center;
-          gap:6px;padding:7px 4px;font-size:11.5px;border:none;background:transparent;
-          border-radius:6px;color:var(--soft);overflow:hidden;white-space:nowrap}
-.seg .btn:hover{background:rgba(255,255,255,.06);color:var(--fg)}
-.seg .btn.on{background:var(--fg);color:#141414}
-.seg svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;
-         stroke-linecap:round;stroke-linejoin:round;flex:none}
-
-/* sliders — the fiddly things made easy */
-.sliders{display:flex;flex-direction:column;gap:9px}
-.sld{display:flex;align-items:center;gap:10px}
-.sld.hide{display:none}
-.sld label{flex:none;width:58px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;
-           color:var(--soft)}
-.sld output{flex:none;width:30px;text-align:right;font-size:10.5px;color:rgba(255,255,255,.45);
-            font-variant-numeric:tabular-nums}
-.sld input{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:16px;background:none;
-           cursor:pointer;margin:0}
-.sld input::-webkit-slider-runnable-track{height:3px;border-radius:2px;
-           background:rgba(255,255,255,.14)}
-.sld input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
-           background:var(--fg);margin-top:-4.5px;
-           box-shadow:0 1px 4px rgba(0,0,0,.5);transition:transform .12s}
-.sld input:hover::-webkit-slider-thumb{transform:scale(1.18)}
-.sld input::-moz-range-track{height:3px;border-radius:2px;background:rgba(255,255,255,.14)}
-.sld input::-moz-range-thumb{width:12px;height:12px;border:none;border-radius:50%;
-           background:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.5)}
+/* ---- the row slider: the whole row is the control ----
+   One gesture for a choice and for a quantity, so View, Sort and Motion
+   all read and behave the same way. */
+.rs{position:relative;display:block;width:100%;height:50px;margin:0 0 7px;padding:0;border:0;
+    border-radius:13px;background:rgba(255,255,255,.055);overflow:hidden;cursor:ew-resize;
+    font:inherit;color:inherit;text-align:left;touch-action:none;
+    -webkit-user-select:none;user-select:none;transition:background .18s}
+.rs:last-child{margin-bottom:0}
+.rs:hover{background:rgba(255,255,255,.085)}
+.rs:focus-visible{outline:1px solid rgba(255,255,255,.4);outline-offset:1px}
+.rs-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:13px;
+         background:rgba(255,255,255,.13);pointer-events:none;
+         transition:width .22s cubic-bezier(.3,.85,.25,1)}
+.rs.live .rs-fill{transition:none}         /* under the finger it must not lag */
+.rs-fill::after{content:"";position:absolute;right:0;top:13px;bottom:13px;width:2px;
+                border-radius:1px;background:rgba(255,255,255,.88)}
+.rs-dots{position:absolute;inset:0;pointer-events:none}
+.rs-dots i{position:absolute;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;
+           border-radius:50%;background:rgba(255,255,255,.2)}
+.rs-lab{position:absolute;left:17px;top:50%;transform:translateY(-50%);font-size:14.5px;
+        pointer-events:none;letter-spacing:-.005em;color:var(--soft);transition:color .18s}
+.rs-val{position:absolute;right:17px;top:50%;transform:translateY(-50%);font-size:14.5px;
+        pointer-events:none;color:var(--fg);font-variant-numeric:tabular-nums}
+.rs.covered .rs-lab{color:var(--fg)}       /* the fill has reached the word */
 
 /* nine meanings, three by three — a grid, which is the point */
 .klist{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
-.chip{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:11.5px;text-align:left;
-      border-radius:6px}
+.chip{display:flex;align-items:center;gap:7px;padding:8px 9px;font-size:11.5px;text-align:left;
+      border-radius:7px}
 .chip i{width:7px;height:7px;border-radius:50%;flex:none}
 .chip u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.5;
         font-variant-numeric:tabular-nums}
-.chip.dim{opacity:.32}
-
-.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.row .lab{flex:none;width:62px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
-          color:var(--soft)}
-.pills{display:flex;flex-wrap:wrap;gap:4px;flex:1}
-.fbtn{padding:5px 10px;font-size:11.5px;border-radius:5px}
-.fbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
+.chip.dim{opacity:.3}
 
 .quiet{padding:3px 2px;font-size:11px;font-weight:400;border:none;background:none;
        color:var(--soft);border-radius:0}
 .quiet:hover{border:none;background:none;color:var(--fg)}
-
-.rule{height:1px;background:var(--edge);margin:13px 0}
-.stack > * + *{margin-top:13px}
+.rule{height:1px;background:var(--edge);margin:15px 0}
+.rs.hide{display:none}

@@ -137,10 +137,13 @@ host.appendChild(more);
 const read = document.createElement('div');
 read.id = 'readout';
 more.appendChild(read);
-/* the strip is the one view you have to push, so it says so */
+/* every view is bigger than the window on purpose, so each one says how to
+   move around its own shape */
 const base = () => loom.view === 'timeline'
   ? 'Drag sideways to run the strip — it loops for ever. Click a picture to hold it.'
-  : 'Hover a picture to see what it is tied to. Click to hold it, click a thread to follow it.';
+  : loom.view === 'sphere'
+  ? 'Drag to turn it. Click a picture to hold it, click a thread to follow it.'
+  : 'Drag to move around it. Click a picture to hold it, click a thread to follow it.';
 const say = h => read.innerHTML = h || base();
 say('');
 

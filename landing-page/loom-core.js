@@ -224,18 +224,24 @@ function mount(opts){
 
   /* the field frames itself into whatever room the panel has left it, so no
      zoom control is needed and every view/sort pairing arrives readable */
+  /* How much closer than "all of it at once" each view sits. Above 1 the
+     arrangement is larger than the window on purpose: you move around it to
+     read it, which is the whole gesture, and the pictures stay big enough to
+     actually be pictures. The sphere is the exception — a globe you turn has
+     to be whole. */
+  const CLOSER = { nodes: 2.1, clusters: 1.5, grid: 1.3, sphere: 1, timeline: 1 };
   function fit(){
     if (userZoom) return;
     const halfW = (innerWidth - inset.left - inset.right) / 2 - 34;
     const halfH = innerHeight / 2 - 54;   /* room for the column names above */
     let s;
-    if (view === 'timeline') s = .23;                      /* a fixed, comfortable tile */
+    if (view === 'timeline') s = .30;                      /* a fixed, comfortable tile */
     else if (view === 'sphere') s = Math.min(halfW, halfH) / (SR + TILE * .42);
     else {
       const e = raw.ext || [4000, 4000];
       s = Math.min(halfW / (e[0] / 2 + TILE * .5), halfH / (e[1] / 2 + TILE * .45));
     }
-    dist = Math.max(1600, Math.min(26000, focal / s));
+    dist = Math.max(1600, Math.min(26000, focal / (s * (CLOSER[view] || 1))));
   }
   function wrap(x){
     const W = raw.loopW;
@@ -660,7 +666,9 @@ function mount(opts){
     if (inChrome(e)) return;
     e.preventDefault();
     userZoom = true;
-    dist = Math.max(900, Math.min(26000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+    /* gentle: 1.075 per notch crossed a whole view's worth of depth in a
+       couple of flicks, which made the wheel feel like a lever, not a dial */
+    dist = Math.max(900, Math.min(26000, dist * (e.deltaY > 0 ? 1.028 : .9728)));
     paint();
   }, { passive: false });
   addEventListener('resize', () => { fit(); paint(); });

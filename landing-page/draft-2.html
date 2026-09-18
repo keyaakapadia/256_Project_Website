@@ -73,9 +73,15 @@
   #explore i{font-style:normal;transition:transform .25s cubic-bezier(.3,.85,.25,1)}
   #explore:hover i{transform:translateX(-4px)}
 
-  #readout{margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--edge);
-           font-size:11px;color:var(--soft);line-height:1.55;min-height:30px}
-  #readout b{color:var(--fg);font-weight:500}
+  /* one line in every state: a long title gives way with an ellipsis before
+     the few words about what to do next ever get pushed off */
+  #readout{display:flex;align-items:baseline;white-space:nowrap;
+           margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--edge);
+           font-size:11px;color:var(--soft);line-height:1.55}
+  #readout b{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+             color:var(--fg);font-weight:500}
+  #readout span{flex:none}
+  #readout span.all{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body>
@@ -120,10 +126,10 @@ const loom = Loom.mount({
   view: 'timeline', sort: 'meaning', motion: .3,
   onView: v => { panel.onView(v); say(''); },
   onSort: s => panel.onSort(s),
-  onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
-  onHold: (i, ln, open) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
-                         ln.length + (open ? ' threads out. Click it again to let go.'
-                                           : ' threads out. Click it again to read it.')),
+  onColumn: k => say(k ? '<span class="all">Column <b>' + k + '</b></span>' : ''),
+  onHold: (i, ln, open) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b><span>' +
+                         (open ? ' · click to let go' : ' · ' + ln.length + ' threads · click to read') +
+                         '</span>'),
   onRelease: () => say('')
 });
 
@@ -133,11 +139,11 @@ read.id = 'readout';
 panel.foot.insertBefore(read, panel.foot.firstChild);
 /* every view is bigger than the window on purpose, so each one says how to
    move around its own shape */
-const base = () => loom.view === 'timeline'
-  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to gather its threads.'
+const base = () => '<span class="all">' + (loom.view === 'timeline'
+  ? 'Drag to run it · click a picture to gather it'
   : loom.view === 'sphere'
-  ? 'Drag to turn it. Click a picture to gather its threads, again to read it.'
-  : 'Drag to move around it. Click a picture to gather its threads, again to read it.';
+  ? 'Drag to turn it · click a picture to gather it'
+  : 'Drag to move · click a picture to gather it') + '</span>';
 const say = h => read.innerHTML = h || base();
 say('');
 

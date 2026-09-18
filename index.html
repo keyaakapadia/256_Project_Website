@@ -45,27 +45,19 @@
   #go{margin-top:36px;padding:13px 30px;font-size:14px;border-radius:7px;
       border:1px solid rgba(255,255,255,.34)}
 
-  /* ---- the colophon: what it is, and what to do with it ----
-     Joe's one note on the final build. It sits at the foot of the cover,
-     quiet enough that the name and the moving field still arrive first,
-     and it goes when you go in: a colophon belongs to the page you enter
-     from, not to the tool it opens. */
+  /* ---- the colophon: who made it ----
+     Joe's one note on the final build. What it is and how to use it now live
+     at the foot of the panel, where there is room for them and where they are
+     wanted; the cover keeps only the credit, quiet enough that the name and the
+     moving field still arrive first. */
   #colophon{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:900px;
-            padding:0 32px 22px;pointer-events:auto;
-            display:flex;flex-wrap:wrap;justify-content:center;gap:11px 44px;
+            padding:0 32px 22px;pointer-events:auto;text-align:center;
             opacity:0;transform:translateY(10px);
             transition:opacity .8s ease .64s,transform .8s ease .64s}
   #cover.up #colophon{opacity:1;transform:none}
-  #colophon .cx{flex:1 1 300px;max-width:390px;padding-top:13px;
-                border-top:1px solid rgba(255,255,255,.13)}
-  #colophon .cxk{display:block;margin-bottom:6px;font-size:9.5px;letter-spacing:.14em;
-                 text-transform:uppercase;color:rgba(255,255,255,.42)}
-  #colophon p{margin:0;font-size:11.5px;line-height:1.55;color:rgba(255,255,255,.58)}
-  #colophon .cxfoot{flex:1 1 100%;text-align:center;font-size:10.5px;
-                    color:rgba(255,255,255,.3)}
+  #colophon .cxfoot{margin:0;font-size:10.5px;line-height:1.55;color:rgba(255,255,255,.3)}
   /* a colophon is the first thing to give up its room when there isn't any */
   @media (max-height:700px){#colophon{display:none}}
-  @media (max-width:620px){#colophon .cx{flex-basis:100%}}
 
   #cover .in > *{opacity:0;transform:translateY(14px);
                  transition:opacity .8s ease,transform .8s ease}
@@ -87,10 +79,21 @@
   #side.in{transform:none}
   #side::-webkit-scrollbar{width:7px}
   #side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
-  #head{margin-bottom:22px}
-  #readout{margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--edge);
-           font-size:11px;color:var(--soft);line-height:1.55;min-height:30px}
-  #readout b{color:var(--fg);font-weight:500}
+  #head{margin-bottom:18px}
+  /* one line in every state: a long title gives way with an ellipsis before
+     the few words about what to do next ever get pushed off */
+  #readout{display:flex;align-items:baseline;white-space:nowrap;
+           margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--edge);
+           font-size:11px;color:var(--soft);line-height:1.55}
+  #about{margin-bottom:14px}
+  #about div + div{margin-top:10px}
+  #about .k{display:block;margin:0 0 5px;font-size:9.5px;letter-spacing:.14em;
+            text-transform:uppercase;color:var(--soft)}
+  #about p{margin:0;font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.6)}
+  #readout b{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+             color:var(--fg);font-weight:500}
+  #readout span{flex:none}
+  #readout span.all{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body class="cover">
@@ -102,6 +105,15 @@
 <aside id="side" class="panel chrome">
   <div id="head" class="mark"><b>Loom</b></div>
   <div id="controls"></div>
+  <!-- moved into the foot of the panel on load, above the readout -->
+  <div id="about">
+    <div><span class="k">What it is</span>
+      <p>150 photographs of grids, each tagged by what the grid does. A line joins two
+         that share a meaning.</p></div>
+    <div><span class="k">Suggested use</span>
+      <p>Pick a meaning and follow it through the archive, or click a picture and pull a
+         thread somewhere new.</p></div>
+  </div>
 </aside>
 
 <div id="cover"><div class="in chrome">
@@ -114,17 +126,6 @@
 </div>
 
 <div id="colophon" class="chrome">
-  <div class="cx">
-    <span class="cxk">What it is</span>
-    <p>150 photographs of grids, each tagged by hand with what the grid does. A line
-       joins two pictures that share a meaning; where a line changes colour, it crossed
-       from one meaning into another.</p>
-  </div>
-  <div class="cx">
-    <span class="cxk">Suggested use</span>
-    <p>Pick a meaning and follow it across the archive. Or click any picture, read what
-       it is joined by, and pull a thread out to something you were not looking for.</p>
-  </div>
   <p class="cxfoot">Loom — Keyaa Kapadia, 256 Part 2, 2026. The engine is kept separate
      from the archive, so it will run on any tagged set of images.</p>
 </div></div>
@@ -152,10 +153,10 @@ const loom = Loom.mount({
   view: 'sphere', sort: 'meaning', motion: .4, locked: true,
   onView: v => { panel.onView(v); say(''); },
   onSort: s => panel.onSort(s),
-  onColumn: k => say(k ? 'Column <b>' + k + '</b>' : ''),
-  onHold: (i, ln, open) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b> — ' +
-                         ln.length + (open ? ' threads out. Click it again to let go.'
-                                           : ' threads out. Click it again to read it.')),
+  onColumn: k => say(k ? '<span class="all">Column <b>' + k + '</b></span>' : ''),
+  onHold: (i, ln, open) => say('<b>' + DATA[i].title.replace(/-/g, ' ') + '</b><span>' +
+                         (open ? ' · click to let go' : ' · ' + ln.length + ' threads · click to read') +
+                         '</span>'),
   onRelease: () => say('')
 });
 
@@ -163,13 +164,16 @@ const panel = Panel.build(document.getElementById('controls'), loom);
 const read = document.createElement('div');
 read.id = 'readout';
 panel.foot.insertBefore(read, panel.foot.firstChild);
+/* what it is and how to use it live at the foot of the panel, in the room the
+   controls leave — not on the cover, where they stood between you and the way in */
+panel.foot.insertBefore(document.getElementById('about'), read);
 /* every view is bigger than the window on purpose, so each one says how to
    move around its own shape */
-const base = () => loom.view === 'timeline'
-  ? 'Drag sideways to run the strip — it loops for ever. Click a picture to gather its threads.'
+const base = () => '<span class="all">' + (loom.view === 'timeline'
+  ? 'Drag to run it · click a picture to gather it'
   : loom.view === 'sphere'
-  ? 'Drag to turn it. Click a picture to gather its threads, again to read it.'
-  : 'Drag to move around it. Click a picture to gather its threads, again to read it.';
+  ? 'Drag to turn it · click a picture to gather it'
+  : 'Drag to move · click a picture to gather it') + '</span>';
 const say = h => read.innerHTML = h || base();
 say('');
 

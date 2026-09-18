@@ -89,7 +89,7 @@ body.cover{cursor:default}
 
 /* ---- trays of pills: view, sort and the key all read the same ---- */
 .stack{display:flex;flex-direction:column;height:100%}
-.sec{margin-bottom:22px}
+.sec{margin-bottom:18px}
 .sect{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft);
       margin:0 3px 9px}
 .note{margin:9px 3px 0;font-size:10.5px;line-height:1.45;color:rgba(255,255,255,.34)}
@@ -98,7 +98,7 @@ body.cover{cursor:default}
 .tray.one{grid-template-columns:1fr}
 .tray.three{grid-template-columns:repeat(3,1fr)}
 
-.pill{display:flex;align-items:center;gap:9px;padding:11px 12px;border:0;border-radius:12px;
+.pill{display:flex;align-items:center;gap:9px;padding:9px 12px;border:0;border-radius:12px;
       background:transparent;color:var(--soft);font:inherit;font-size:12.5px;text-align:left;
       cursor:pointer;overflow:hidden;
       transition:background .16s,color .16s,box-shadow .16s}
@@ -113,15 +113,16 @@ body.cover{cursor:default}
 .pill s{text-decoration:none;flex:none;font-weight:400;font-size:9.5px;opacity:.5;
         font-variant-numeric:tabular-nums}
 /* tight: a tray of three leaves about 77px of content per pill, and a name
-   plus its count has to live inside that without spilling */
-.tray.three .pill{gap:6px;padding:10px 8px;font-size:11px}
-.tray.centre .pill{justify-content:center;padding:11px 6px}
+   plus its count has to fit inside that even when a short window brings in a
+   scrollbar and takes 7px off the panel — so the side padding is 7, not 8 */
+.tray.three .pill{gap:5px;padding:8px 7px;font-size:11px}
+.tray.centre .pill{justify-content:center;padding:9px 6px}
 /* u is flex:1 by default, so it fills the pill and its text stays left —
    centring the flex children is not enough on its own */
 .tray.centre .pill u{flex:none;text-align:center}
 
 /* the foot sits at the bottom of whatever height the panel has */
-.foot{margin-top:auto;padding-top:20px}
+.foot{margin-top:auto;padding-top:14px}
 .quiet{display:block;padding:3px 3px;font-size:11px;font-weight:400;border:0;background:none;
        color:var(--soft);cursor:pointer;font-family:inherit;transition:color .15s}
 .quiet:hover{color:var(--fg)}

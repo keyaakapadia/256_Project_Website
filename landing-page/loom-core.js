@@ -87,7 +87,7 @@ function order(sort){
    every band 40 clear of the next — enough to read them as three separate runs,
    not enough to turn them into a grid. Fifty to a band, long and low, and a
    loop you can travel a good way down before it repeats. */
-const TL_PER = 50, TL_CW = 330, TL_RH = 304;
+const TL_BANDS = 3, TL_CW = 330, TL_RH = 304;
 const G_CW = 300, G_RH = 255, G_GAP = 170, G_WIDE = 2;
 const CL_CW = 275, CL_RH = 235, CL_GAP = 420, CL_VGAP = 560;
 
@@ -116,14 +116,21 @@ function layout(view, sort){
 
   else if (view === 'timeline'){
     /* an endless strip, three bands deep and edge to edge. Every band scrolls in
-       lockstep and wraps at the same width, so the loop never shows a seam. */
-    const bands = Math.ceil(N / TL_PER);
+       lockstep and wraps at the same width, so the loop never shows a seam.
+
+       Filled COLUMN by column, not row by row. Row by row put ranks 0-49 in the
+       top band, 50-99 in the middle and 100-149 in the bottom — three unrelated
+       slices of the sort stacked on each other, so a colour sort showed greys
+       over oranges over greens and no run at all. Column by column, each column
+       holds three consecutive ranks, so travelling across the strip walks the
+       whole order: neutral at one end, the far side of the wheel at the other. */
+    const span = Math.ceil(N / TL_BANDS);
     ord.forEach((i, k) => {
-      const band = Math.floor(k / TL_PER), col = k % TL_PER;
-      out[i] = [(col - (TL_PER - 1) / 2) * TL_CW, (band - (bands - 1) / 2) * TL_RH, 0];
+      const col = Math.floor(k / TL_BANDS), band = k % TL_BANDS;
+      out[i] = [(col - (span - 1) / 2) * TL_CW, (band - (TL_BANDS - 1) / 2) * TL_RH, 0];
     });
     runs.forEach(k => tag(k, { anchor: g[k][0] }));
-    return { pos: out, columns: cols, loopW: TL_PER * TL_CW };
+    return { pos: out, columns: cols, loopW: span * TL_CW };
   }
 
   else if (view === 'grid'){
@@ -251,7 +258,7 @@ function mount(opts){
     const halfW = (innerWidth - inset.left - inset.right) / 2 - 34;
     const halfH = innerHeight / 2 - 54;   /* room for the column names above */
     let s;
-    if (view === 'timeline') s = .42;   /* no gaps to pay for, so the tile can be large */
+    if (view === 'timeline') s = .34;   /* enough of the run in view to read it as a run */
     else if (view === 'sphere') s = Math.min(halfW, halfH) / (SR + TILE * .42);
     else {
       const e = raw.ext || [4000, 4000];
@@ -549,9 +556,14 @@ function mount(opts){
   function paintLabels(globe, focusI){
     while (colLabels.length < columns.length) colLabels.push(mkLabel(''));
     const dim = focusI < 0 ? 1 : .3;
+    /* Nodes and the Sphere are the two views where the threads cross everything;
+       nine names sitting in that would be nine more things to read through. In
+       those two only the run you are pointing at says its name. */
+    const crowded = view === 'nodes' || view === 'sphere';
     colLabels.forEach((el, k) => {
       const c = columns[k];
       if (!c || animating || pinned >= 0){ el.style.opacity = 0; return; }
+      if (crowded && guideCol !== c.key){ el.style.opacity = 0; return; }
       let q, dy = -22, size = 11;
       if (c.u){                               /* the sphere sets it on the equator */
         const r = rot(c.u), R = SR * 1.2;

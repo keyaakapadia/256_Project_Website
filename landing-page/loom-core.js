@@ -82,11 +82,12 @@ function order(sort){
 }
 
 /* ---------- the five shapes ---------- */
-/* The strip's pitch IS the tile: TILE across, TILE * .8 down. Every gap is the
-   same because every gap is nothing — the run is one continuous woven surface
-   rather than rows with alleys between them. Fifty to a band gives three bands,
-   long and low, and a loop you can travel a long way down before it repeats. */
-const TL_PER = 50, TL_CW = 330, TL_RH = 264;
+/* The strip's pitch across IS the tile, so each band is one unbroken run of
+   pictures. Down, the tile is TILE * .8 = 264 and the pitch is 304, which sets
+   every band 40 clear of the next — enough to read them as three separate runs,
+   not enough to turn them into a grid. Fifty to a band, long and low, and a
+   loop you can travel a good way down before it repeats. */
+const TL_PER = 50, TL_CW = 330, TL_RH = 304;
 const G_CW = 300, G_RH = 255, G_GAP = 170, G_WIDE = 2;
 const CL_CW = 275, CL_RH = 235, CL_GAP = 420, CL_VGAP = 560;
 

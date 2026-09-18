@@ -45,6 +45,28 @@
   #go{margin-top:36px;padding:13px 30px;font-size:14px;border-radius:7px;
       border:1px solid rgba(255,255,255,.34)}
 
+  /* ---- the colophon: what it is, and what to do with it ----
+     Joe's one note on the final build. It sits at the foot of the cover,
+     quiet enough that the name and the moving field still arrive first,
+     and it goes when you go in: a colophon belongs to the page you enter
+     from, not to the tool it opens. */
+  #colophon{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:900px;
+            padding:0 32px 22px;pointer-events:auto;
+            display:flex;flex-wrap:wrap;justify-content:center;gap:11px 44px;
+            opacity:0;transform:translateY(10px);
+            transition:opacity .8s ease .64s,transform .8s ease .64s}
+  #cover.up #colophon{opacity:1;transform:none}
+  #colophon .cx{flex:1 1 300px;max-width:390px;padding-top:13px;
+                border-top:1px solid rgba(255,255,255,.13)}
+  #colophon .cxk{display:block;margin-bottom:6px;font-size:9.5px;letter-spacing:.14em;
+                 text-transform:uppercase;color:rgba(255,255,255,.42)}
+  #colophon p{margin:0;font-size:11.5px;line-height:1.55;color:rgba(255,255,255,.58)}
+  #colophon .cxfoot{flex:1 1 100%;text-align:center;font-size:10.5px;
+                    color:rgba(255,255,255,.3)}
+  /* a colophon is the first thing to give up its room when there isn't any */
+  @media (max-height:700px){#colophon{display:none}}
+  @media (max-width:620px){#colophon .cx{flex-basis:100%}}
+
   #cover .in > *{opacity:0;transform:translateY(14px);
                  transition:opacity .8s ease,transform .8s ease}
   #cover.up .in > *{opacity:1;transform:none}
@@ -89,6 +111,22 @@
   <p class="lede">Click an image to <em>gather what it is tied to</em><i>·</i>pick a colour
     below to <em>pull its threads forward</em></p>
   <button class="btn" id="go">Explore</button>
+</div>
+
+<div id="colophon" class="chrome">
+  <div class="cx">
+    <span class="cxk">What it is</span>
+    <p>150 photographs of grids, each tagged by hand with what the grid does. A line
+       joins two pictures that share a meaning; where a line changes colour, it crossed
+       from one meaning into another.</p>
+  </div>
+  <div class="cx">
+    <span class="cxk">Suggested use</span>
+    <p>Pick a meaning and follow it across the archive. Or click any picture, read what
+       it is joined by, and pull a thread out to something you were not looking for.</p>
+  </div>
+  <p class="cxfoot">Loom — Keyaa Kapadia, 256 Part 2, 2026. The engine is kept separate
+     from the archive, so it will run on any tagged set of images.</p>
 </div></div>
 
 <div id="veil"></div>

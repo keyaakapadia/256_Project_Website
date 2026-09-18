@@ -4,7 +4,9 @@
    Two questions and a key, asked in order:
      VIEW                  the shape the pictures are laid into
      SORT BY               the order they are laid in — and, where a view
-                           groups, what it groups and names its columns by
+                           groups, what it groups and names its columns by.
+                           Matrix sets its own two axes, so there the order
+                           has nothing left to decide and the tray says so.
      WHAT THE LINES MEAN   the nine meanings, which are what the lines are
 
    All three are the same object: a tray with pills in it. The tray
@@ -55,7 +57,13 @@ function build(host, loom){
     k => loom.reSort(k)));
   const note = sSec.appendChild(document.createElement('p'));
   note.className = 'note';
-  note.textContent = Loom.SORT_NOTE[loom.sort];
+  const FIXED = 'the matrix sets its own two axes';
+  const fixed = () => loom.view === 'matrix';
+  function syncSort(){
+    sSec.classList.toggle('is-fixed', fixed());
+    note.textContent = fixed() ? FIXED : Loom.SORT_NOTE[loom.sort];
+  }
+  syncSort();
 
   /* ---- 3. the key: the lines are the meanings ---- */
   const kSec = host.appendChild(section('key', 'What the lines mean'));
@@ -86,8 +94,8 @@ function build(host, loom){
 
   return {
     foot: foot,
-    onView(){ vTray.sync(); },
-    onSort(s){ sTray.sync(); note.textContent = Loom.SORT_NOTE[s]; }
+    onView(){ vTray.sync(); syncSort(); },
+    onSort(){ sTray.sync(); syncSort(); }
   };
 }
 

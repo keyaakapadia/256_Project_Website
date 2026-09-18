@@ -127,3 +127,9 @@ body.cover{cursor:default}
 .quiet:hover{color:var(--fg)}
 
 .rule{height:1px;background:var(--edge);margin:15px 0}
+
+/* a sort has nothing to decide inside the matrix, whose two axes are fixed.
+   Dimmed and out of reach rather than hidden: the control is still there,
+   and the note underneath says why it is not doing anything. */
+.sec.is-fixed .tray{opacity:.34;pointer-events:none}
+.sec.is-fixed .note{opacity:.8}

@@ -10,7 +10,8 @@
 
    A view is a shape. A sort is an order — and, where a view groups,
    the sort is also what it groups and labels by. Change the sort and
-   the column names change with it.
+   the column names change with it. Matrix is the one exception: it
+   sets its own two axes, because a matrix IS its axes.
 
    Loads after ../assets/loom.js, which defines DATA and META.
 ------------------------------------------------------------------ */
@@ -24,9 +25,10 @@ const VIEWS = {
   timeline: { label: 'Timeline' },
   clusters: { label: 'Clusters' },
   grid:     { label: 'Grid'     },
+  matrix:   { label: 'Matrix'   },
   sphere:   { label: 'Sphere'   }
 };
-const VIEW_ORDER = ['nodes', 'timeline', 'clusters', 'grid', 'sphere'];
+const VIEW_ORDER = ['nodes', 'timeline', 'clusters', 'grid', 'matrix', 'sphere'];
 const SORTS = { colour: 'Colour', meaning: 'Meaning', freq: 'Frequency' };
 const SORT_ORDER = ['meaning', 'colour', 'freq'];   /* meaning first, and the default */
 const SORT_NOTE = {
@@ -39,6 +41,7 @@ const ICON = {
   timeline: '<path d="M3 10h14"/><path d="M5 7v6M9 5.5v9M13 7.5v5M16.5 6.5v7"/>',
   clusters: '<circle cx="6" cy="6" r="2.6"/><circle cx="14.5" cy="5.5" r="2"/><circle cx="6.5" cy="14.5" r="2"/><circle cx="14" cy="14" r="2.6"/>',
   grid:     '<rect x="3" y="3" width="5.5" height="5.5"/><rect x="11.5" y="3" width="5.5" height="5.5"/><rect x="3" y="11.5" width="5.5" height="5.5"/><rect x="11.5" y="11.5" width="5.5" height="5.5"/>',
+  matrix:   '<path d="M10 2.5v15M2.5 10h15"/><circle cx="6" cy="6.5" r="1.3"/><circle cx="14.2" cy="5.6" r="1.3"/><circle cx="6.8" cy="14" r="1.3"/><circle cx="13.4" cy="13.8" r="1.3"/>',
   sphere:   '<circle cx="10" cy="10" r="7"/><ellipse cx="10" cy="10" rx="3.2" ry="7"/><path d="M3 10h14"/>'
 };
 
@@ -50,6 +53,33 @@ const FAMCUT = [[15,'red'],[45,'orange'],[70,'yellow'],[160,'green'],[200,'cyan'
                 [255,'blue'],[290,'violet'],[335,'magenta'],[361,'red']];
 const familyOf = d => d.sat < 8 ? 'neutral' : FAMCUT.find(f => d.hue < f[0])[1];
 const FREQCOL = ['#e6e2d8', '#a8a49a', '#6b6860'];
+
+/* ---------- the matrix ----------
+   After New York Magazine's Approval Matrix, which plots a week of culture
+   against two axes of judgement rather than two categories, and lets the
+   four corners do the talking.
+
+   The axis view this replaces put how often you see a grid against where it
+   was found, and "where" turned the whole chart into a map before anyone got
+   to the other axis. Both of these axes are about the grid itself:
+
+     across   does it hold what is inside it, or let it go
+     down     how often you meet it — every day at the top, rarely at the foot
+
+   Fixed, and not moved by the sort, because a matrix is its axes. */
+const MX_W = 3300, MX_H = 2250, MX_MIN = 344;   /* a shade wider than a tile */
+const HOLD = { control: 1, contain: .85, measure: .7, separate: .6, organize: .45,
+               guide: .1, repeat: -.25, play: -.8, break: -1 };
+const holdOf = d => d.means.reduce((a, m) => a + HOLD[m], 0) / d.means.length;
+/* sx/sy are which half of each axis the corner sits in */
+const MX_QUAD = [
+  { key: 'infrastructure', color: META.mcol.contain, sx: -1, sy: -1 },
+  { key: 'decoration',     color: META.mcol.play,    sx:  1, sy: -1 },
+  { key: 'apparatus',      color: META.mcol.control, sx: -1, sy:  1 },
+  { key: 'anomaly',        color: META.mcol['break'],sx:  1, sy:  1 }
+];
+const MX_AXIS = [['seen every day', 0, -MX_H * 1.17], ['seen rarely', 0, MX_H * 1.17],
+                 ['holds', -MX_W * 1.07, 0], ['releases', MX_W * 1.07, 0]];
 
 const MIDX = {}; META.meanings.forEach((m, i) => MIDX[m] = i);
 const FMIN = Math.min.apply(null, DATA.map(d => d.freq));
@@ -93,6 +123,7 @@ const CL_CW = 275, CL_RH = 235, CL_GAP = 420, CL_VGAP = 560;
 
 function layout(view, sort){
   const ord = order(sort), out = new Array(N), cols = [];
+  let axes = null;                       /* the matrix's four edge words */
   const G = grouping(sort);
 
   /* every view groups by the sort, even the ones with no boxes to draw —
@@ -177,6 +208,42 @@ function layout(view, sort){
     }
   }
 
+  else if (view === 'matrix'){
+    /* Where a picture wants to sit is decided by the two axes alone. But the
+       nine meanings are a short list, so a great many pictures want the exact
+       same column, and a stack of 330px tiles on one spot is one tile. Each
+       one is walked out from its true place along the golden angle until it is
+       clear of everything already down: near enough to still read as its own
+       position, never sitting on top of whatever got there first. */
+    const placed = [];
+    ord.forEach(i => {
+      const d = DATA[i];
+      const bx = -holdOf(d) * MX_W, by = (fnorm(d) - .5) * 2 * MX_H;
+      let x = bx, y = by;
+      for (let s = 1; s < 260 &&
+           placed.some(p => Math.hypot(p[0] - x, p[1] - y) < MX_MIN); s++){
+        const a = s * 2.399963, r = MX_MIN * .58 * Math.sqrt(s);
+        x = bx + Math.cos(a) * r; y = by + Math.sin(a) * r;
+      }
+      placed.push([x, y]);
+      out[i] = [x, y, 0];
+    });
+    /* four boxes meeting at the origin: the floor draws them, so the cross
+       down the middle of the matrix is the four quadrants' shared edges */
+    MX_QUAD.forEach(q => {
+      const items = ord.filter(i => (out[i][0] < 0 ? -1 : 1) === q.sx &&
+                                    (out[i][1] < 0 ? -1 : 1) === q.sy);
+      if (!items.length) return;
+      cols.push({ key: q.key, label: q.key, color: q.color, items: items,
+                  x: q.sx * MX_W / 2, halfW: MX_W / 2,
+                  top:    q.sy < 0 ? -MX_H : 0,
+                  bottom: q.sy < 0 ? 0 : MX_H,
+                  labelY: q.sy * MX_H, dy: q.sy < 0 ? -22 : 30 });
+    });
+    /* the four edge words, carried through the centring below with everything else */
+    axes = MX_AXIS.map(a => [a[1], a[2]]);
+  }
+
   else {                                      /* sphere: round is the order, poles are how often */
     ord.forEach((i, k) => {
       const lon = (k / N) * Math.PI * 2;
@@ -198,8 +265,12 @@ function layout(view, sort){
                      if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; });
   const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
   out.forEach(p => { p[0] -= mx; p[1] -= my; });
-  cols.forEach(c => { if (c.halfW != null){ c.x -= mx; c.top -= my; c.bottom -= my; } });
-  return { pos: out, columns: cols, ext: [x1 - x0, y1 - y0] };
+  cols.forEach(c => {
+    if (c.halfW != null){ c.x -= mx; c.top -= my; c.bottom -= my; }
+    if (c.labelY != null) c.labelY -= my;
+  });
+  if (axes) axes.forEach(a => { a[0] -= mx; a[1] -= my; });
+  return { pos: out, columns: cols, axes: axes, ext: [x1 - x0, y1 - y0] };
 }
 
 /* ================================================================== */
@@ -256,7 +327,9 @@ function mount(opts){
      read it, which is the whole gesture, and the pictures stay big enough to
      actually be pictures. The sphere is the exception — a globe you turn has
      to be whole. */
-  const CLOSER = { nodes: 2.1, clusters: 1.5, grid: 1.3, sphere: 1, timeline: 1 };
+  /* the matrix, like the sphere, has to arrive whole — half a matrix is not
+     one, and the four corners only mean anything against each other */
+  const CLOSER = { nodes: 2.1, clusters: 1.5, grid: 1.3, sphere: 1, timeline: 1, matrix: .8 };
   function fit(){
     if (userZoom) return;
     const halfW = (innerWidth - inset.left - inset.right) / 2 - 34;
@@ -374,6 +447,7 @@ function mount(opts){
   const colLabels = [];
   const poleLabels = [['seen every day', [0, -1, 0]], ['seen rarely', [0, 1, 0]]]
     .map(p => ({ el: mkLabel(p[0]), u: p[1] }));
+  const axisLabels = MX_AXIS.map(a => mkLabel(a[0]));
 
   /* ---------- projection ---------- */
   const midX = () => (inset.left + innerWidth - inset.right) / 2;
@@ -442,14 +516,39 @@ function mount(opts){
     fx.setTransform(dpr, 0, 0, dpr, 0, 0);
     fx.clearRect(0, 0, innerWidth, innerHeight);
     if (!columns.length || pinned >= 0 || animating) return;
-    columns.forEach(c => {
-      if (c.halfW == null) return;            /* a name with no box under it */
+    const boxes = columns.filter(c => c.halfW != null);
+    /* The matrix is its cross. Four separate boxes drawn at the weight the
+       other views use left the quadrants reading as one soft blob, so here
+       the shared edges are drawn once, as the two axes they actually are. */
+    if (view === 'matrix' && boxes.length){
+      const L = Math.min.apply(null, boxes.map(c => c.x - c.halfW));
+      const R = Math.max.apply(null, boxes.map(c => c.x + c.halfW));
+      const T = Math.min.apply(null, boxes.map(c => c.top));
+      const B = Math.max.apply(null, boxes.map(c => c.bottom));
+      const a = project(L, T, 0), b = project(R, B, 0),
+            m = project((L + R) / 2, (T + B) / 2, 0);
+      if (a && b && m){
+        fx.lineWidth = 1;
+        fx.strokeStyle = 'rgba(255,255,255,.13)';
+        fx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+        fx.strokeStyle = 'rgba(255,255,255,.34)';
+        fx.beginPath();
+        fx.moveTo(m.x, a.y); fx.lineTo(m.x, b.y);
+        fx.moveTo(a.x, m.y); fx.lineTo(b.x, m.y);
+        fx.stroke();
+      }
+    }
+    boxes.forEach(c => {
       const on = guideCol === c.key;
       const a = project(c.x - c.halfW, c.top, 0), b = project(c.x + c.halfW, c.bottom, 0);
       if (!a || !b) return;
       fx.lineWidth = 1;
-      fx.strokeStyle = rgba(c.color, on ? .5 : .15);
-      fx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      /* in the matrix the outline is already there — only the corner you are
+         pointing at needs saying again */
+      if (view !== 'matrix' || on){
+        fx.strokeStyle = rgba(c.color, on ? .5 : .15);
+        fx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      }
       if (on){ fx.fillStyle = rgba(c.color, .07); fx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y); }
     });
   }
@@ -570,7 +669,7 @@ function mount(opts){
       const c = columns[k];
       if (!c || animating || pinned >= 0){ el.style.opacity = 0; return; }
       if (crowded && guideCol !== c.key){ el.style.opacity = 0; return; }
-      let q, dy = -22, size = 11;
+      let q, dy = c.dy != null ? c.dy : -22, size = 11;
       if (c.u){                               /* the sphere sets it on the equator */
         const r = rot(c.u), R = SR * 1.2;
         if (r[2] > .4){ el.style.opacity = 0; return; }    /* round the far side */
@@ -582,7 +681,7 @@ function mount(opts){
       } else {
         /* a fixed distance above the block ON SCREEN, not in the world — a tall
            group would otherwise push its own name off the top of the window */
-        q = project(c.x, c.top, 0);
+        q = project(c.x, c.labelY != null ? c.labelY : c.top, 0);
       }
       if (!q){ el.style.opacity = 0; return; }
       if (el.__t !== c.label){ el.textContent = c.label; el.__t = c.label; el.__w = el.offsetWidth; }
@@ -596,6 +695,16 @@ function mount(opts){
       el.style.color = guideCol === c.key ? c.color : '';
       el.classList.toggle('lit', guideCol === c.key);
       el.style.opacity = (hotCol && hotCol !== c.key ? .25 : .85) * dim;
+    });
+    axisLabels.forEach((el, k) => {
+      /* only the matrix has edges to name, and they say what the two axes are */
+      const a = raw.axes && raw.axes[k];
+      if (!a || animating || pinned >= 0){ el.style.opacity = 0; return; }
+      const q = project(a[0], a[1], 0);
+      if (!q){ el.style.opacity = 0; return; }
+      el.style.transform = 'translate(' + q.x + 'px,' + q.y + 'px) translate(-50%,-50%)';
+      el.style.fontSize = '11px';
+      el.style.opacity = .55 * dim;
     });
     poleLabels.forEach(o => {
       /* the poles are how often a picture is seen, which is only worth naming

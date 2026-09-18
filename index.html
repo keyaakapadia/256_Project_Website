@@ -35,14 +35,12 @@
   #cols button:hover b,#cols button.lit b{opacity:1;transform:scaleY(3.2)}
   #cols.dimmed button:not(.lit):not(:hover){opacity:.4}
 
-  /* the three things you can do, kept from the first build */
-  .steps{display:flex;flex-direction:column;gap:9px;margin:34px auto 0;text-align:left;
-         max-width:392px}
-  .steps div{display:flex;align-items:baseline;gap:13px;font-size:14px;
-             color:rgba(255,255,255,.62)}
-  .steps b{flex:none;width:15px;font-weight:400;font-size:11.5px;
-           color:rgba(255,255,255,.34);font-variant-numeric:tabular-nums}
-  .steps em{font-style:normal;color:var(--fg)}
+  /* one line, not three: the second click and what it shows are things to find,
+     not things to be told before you have touched anything */
+  .lede{margin:32px auto 0;font-size:14px;line-height:1.5;color:rgba(255,255,255,.6);
+        max-width:660px}          /* wide enough to stay the one line it says it is */
+  .lede em{font-style:normal;color:var(--fg)}
+  .lede i{font-style:normal;color:rgba(255,255,255,.28);padding:0 9px}
 
   #go{margin-top:36px;padding:13px 30px;font-size:14px;border-radius:7px;
       border:1px solid rgba(255,255,255,.34)}
@@ -88,11 +86,8 @@
   <h1>Loom</h1>
   <p class="sub">150 grids, tied together by what they share.</p>
   <div id="cols"></div>
-  <div class="steps">
-    <div><b>1</b><span>Click any image to <em>gather what it is tied to</em></span></div>
-    <div><b>2</b><span>Click it again to <em>turn it over</em> and read its numbers</span></div>
-    <div><b>3</b><span>Pick a colour below to <em>pull its threads forward</em></span></div>
-  </div>
+  <p class="lede">Click an image to <em>gather what it is tied to</em><i>·</i>pick a colour
+    below to <em>pull its threads forward</em></p>
   <button class="btn" id="go">Explore</button>
 </div></div>
 

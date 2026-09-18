@@ -213,12 +213,27 @@ function mount(opts){
   const focal = 1400;
   let dist = 6000, camX = 0, camY = 0, scrollX = 0, scrollV = 0, userZoom = false;
   let yaw = .5, pitch = -.2, running = false;
-  /* Behind a cover nothing can be touched, so the field shows what it does.
-     In the tool it drifts only until the cursor moves — the first time you
-     reach for it, it is yours and it stops. */
-  const IDLE_SPIN = .0011;
+  /* Behind a cover the field shows what it does. In the tool it never quite
+     stops: the sphere keeps turning, slower, and every view breathes — the
+     whole thing drifting a dozen pixels across a half-minute and easing a
+     percent nearer and further. Small enough that you would not point at it,
+     enough that the page is never a still image. It runs while your attention
+     is loose and holds the moment you point at something: hovering a picture
+     or a column, dragging, or holding a card. Behind the cover it never stops,
+     since the cover's whole job is to show the thing working. */
+  const IDLE_SPIN = .00042;
+  /* az is small on purpose: a depth breath scales about the centre, so whatever
+     it does in the middle it does several times over at the edges of a wide
+     view. The lateral drift carries the motion; depth only softens it. */
+  const BR = { ax: 13, ay: 8, az: .005, px: 29000, py: 43000, pz: 37000 };
+  let bx = 0, by = 0, bz = 1;
+  function breathe(now){
+    const w = Math.PI * 2;
+    bx = Math.sin(now / BR.px * w) * BR.ax;
+    by = Math.sin(now / BR.py * w + 1.1) * BR.ay;
+    bz = 1 + Math.sin(now / BR.pz * w + 2.3) * BR.az;
+  }
   let motion = opts.motion == null ? .4 : opts.motion;
-  let restless = !opts.locked;
   let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false;
   let animating = false, anim = null, locked = !!opts.locked;
   let hot = -1, pinned = -1, flipped = false, hotLine = -1, hotCol = null, downIdx = -1, downFace = null;
@@ -373,10 +388,10 @@ function mount(opts){
   const midX = () => (inset.left + innerWidth - inset.right) / 2;
   const midY = () => (inset.top + innerHeight - inset.bottom) / 2;
   function project(x, y, z){
-    const d = z + dist;
+    const d = z + dist * bz;
     if (d < 90) return null;
     const s = focal / d;
-    return { x: midX() + (x - camX) * s, y: midY() + (y - camY) * s, s: s, d: d };
+    return { x: midX() + bx + (x - camX) * s, y: midY() + by + (y - camY) * s, s: s, d: d };
   }
   const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
     return 'rgba(' + (v >> 16 & 255) + ',' + (v >> 8 & 255) + ',' + (v & 255) + ',' + a + ')'; };
@@ -450,6 +465,7 @@ function mount(opts){
 
   /* ---------- draw ---------- */
   function paint(){
+    breathe(performance.now());
     const dpr = Math.min(2, devicePixelRatio || 1);
     if (cv.width !== innerWidth * dpr){ cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
     cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
@@ -719,9 +735,10 @@ function mount(opts){
       paint();
       return;
     }
-    if (inChrome(e)) return;
-    /* the cursor has arrived: hand the field over and stop drifting */
-    if (restless){ restless = false; }
+    if (inChrome(e)){                       /* on the panel: let the field breathe again */
+      if (hotCol){ hotCol = null; if (opts.onColumn) opts.onColumn(null); paint(); }
+      return;
+    }
     let dirty = false;
     if (segs.length){
       const k = nearestSeg(e.clientX, e.clientY);
@@ -747,19 +764,21 @@ function mount(opts){
   /* ---------- the motion a view has of its own ---------- */
   function frame(){
     if (!running) return;
-    if (pinned < 0 && !drag && !animating){
+    const still = drag || (!locked && (hot >= 0 || hotCol || pinned >= 0));
+    if (!still && !animating){               /* a tween paints its own frames */
       if (view === 'sphere'){
-        const rate = locked ? motion * .0045 : (restless ? IDLE_SPIN : 0);
-        if (rate){ yaw += rate; pos = scaled(); paint(); }
+        yaw += locked ? motion * .0045 : IDLE_SPIN;
+        pos = scaled();
       } else if (view === 'timeline'){
         if (Math.abs(scrollV) > .6){         /* coasting to a stop after a flick */
-          scrollX += scrollV; scrollV *= .93; pos = scaled(); paint();
+          scrollX += scrollV; scrollV *= .93; pos = scaled();
         } else if (locked && motion > 0){
           /* only behind the cover, where nothing can be dragged, does the strip
              run on its own — in the tool it moves when you move it */
-          scrollX += motion * 16; pos = scaled(); paint();
+          scrollX += motion * 16; pos = scaled();
         }
       }
+      paint();                               /* every frame, so the breath shows */
     }
     requestAnimationFrame(frame);
   }
@@ -770,7 +789,7 @@ function mount(opts){
     view = v; camX = camY = 0; pinned = -1; flipped = false; hotCol = null; userZoom = false;
     if (v === 'timeline') scrollX = 0;
     relayout();
-    tween(scaled(), 950, scaled);
+    tween(scaled(), 1100, scaled);       /* a shade longer, so a view arrives rather than snaps */
     wake();
     if (opts.onView) opts.onView(v);
   }
@@ -791,8 +810,8 @@ function mount(opts){
     reset(){ only = null; lit = null; paint(); },
     setLocked(v){
       locked = v;
-      if (v){ pinned = -1; flipped = false; hotCol = null; restless = false; }
-      else { restless = true; wake(); }     /* a slow drift, until the cursor arrives */
+      if (v){ pinned = -1; flipped = false; hotCol = null; }
+      wake();                                /* the field keeps breathing either way */
     },
     setInset(o){ Object.assign(inset, o); fit(); paint(); },
     ready(cb){

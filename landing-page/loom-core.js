@@ -213,26 +213,15 @@ function mount(opts){
   const focal = 1400;
   let dist = 6000, camX = 0, camY = 0, scrollX = 0, scrollV = 0, userZoom = false;
   let yaw = .5, pitch = -.2, running = false;
-  /* Behind a cover the field shows what it does. In the tool it never quite
-     stops: the sphere keeps turning, slower, and every view breathes — the
-     whole thing drifting a dozen pixels across a half-minute and easing a
-     percent nearer and further. Small enough that you would not point at it,
-     enough that the page is never a still image. It runs while your attention
-     is loose and holds the moment you point at something: hovering a picture
-     or a column, dragging, or holding a card. Behind the cover it never stops,
-     since the cover's whole job is to show the thing working. */
-  const IDLE_SPIN = .00042;
-  /* az is small on purpose: a depth breath scales about the centre, so whatever
-     it does in the middle it does several times over at the edges of a wide
-     view. The lateral drift carries the motion; depth only softens it. */
-  const BR = { ax: 13, ay: 8, az: .005, px: 29000, py: 43000, pz: 37000 };
-  let bx = 0, by = 0, bz = 1;
-  function breathe(now){
-    const w = Math.PI * 2;
-    bx = Math.sin(now / BR.px * w) * BR.ax;
-    by = Math.sin(now / BR.py * w + 1.1) * BR.ay;
-    bz = 1 + Math.sin(now / BR.pz * w + 2.3) * BR.az;
-  }
+  /* Two things move, and both move as one piece: the strip runs across and the
+     sphere turns. Nothing else does — a column chart that drifts is a column
+     chart you cannot read, and points that each wander on their own phase read
+     as a shiver however small you make them, because neighbours are always
+     going opposite ways. Both stop the moment you point at something: hovering
+     a picture or a column, dragging, or holding a card open. Behind the cover
+     nothing can be pointed at, so there they never stop. */
+  const IDLE_SPIN = .00042;      /* sphere: a turn every four minutes */
+  const TL_DRIFT  = 1.4;         /* timeline: about 30px a second across */
   let motion = opts.motion == null ? .4 : opts.motion;
   let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false;
   let animating = false, anim = null, locked = !!opts.locked;
@@ -285,11 +274,13 @@ function mount(opts){
     const W = raw.loopW;
     return ((x + W / 2) % W + W) % W - W / 2;
   }
-  const scaled = () =>
-    view === 'sphere' ? raw.pos.map(u => { const r = rot(u);
-                                           return [r[0] * SR, r[1] * SR, r[2] * SR]; })
-  : view === 'timeline' ? raw.pos.map(p => [wrap(p[0] - scrollX), p[1], p[2]])
-  : raw.pos.map(p => p.slice());
+  const scaled = () => {
+    if (view === 'sphere')
+      return raw.pos.map(u => { const r = rot(u); return [r[0] * SR, r[1] * SR, r[2] * SR]; });
+    if (view === 'timeline')
+      return raw.pos.map(p => [wrap(p[0] - scrollX), p[1], p[2]]);
+    return raw.pos.map(p => p.slice());       /* nodes, clusters and grid hold still */
+  };
 
   function relayout(){
     raw = layout(view, sort);
@@ -388,10 +379,10 @@ function mount(opts){
   const midX = () => (inset.left + innerWidth - inset.right) / 2;
   const midY = () => (inset.top + innerHeight - inset.bottom) / 2;
   function project(x, y, z){
-    const d = z + dist * bz;
+    const d = z + dist;
     if (d < 90) return null;
     const s = focal / d;
-    return { x: midX() + bx + (x - camX) * s, y: midY() + by + (y - camY) * s, s: s, d: d };
+    return { x: midX() + (x - camX) * s, y: midY() + (y - camY) * s, s: s, d: d };
   }
   const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
     return 'rgba(' + (v >> 16 & 255) + ',' + (v >> 8 & 255) + ',' + (v & 255) + ',' + a + ')'; };
@@ -465,7 +456,6 @@ function mount(opts){
 
   /* ---------- draw ---------- */
   function paint(){
-    breathe(performance.now());
     const dpr = Math.min(2, devicePixelRatio || 1);
     if (cv.width !== innerWidth * dpr){ cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
     cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
@@ -608,7 +598,11 @@ function mount(opts){
       el.style.opacity = (hotCol && hotCol !== c.key ? .25 : .85) * dim;
     });
     poleLabels.forEach(o => {
-      if (!globe){ o.el.style.opacity = 0; return; }
+      /* the poles are how often a picture is seen, which is only worth naming
+         when that is what you asked to sort by. Under any other sort the two
+         choices you made are the only things the field says, and the run names
+         round the equator already say them. */
+      if (!globe || sort !== 'freq'){ o.el.style.opacity = 0; return; }
       const r = rot(o.u), R = SR * 1.05, q = project(r[0] * R, r[1] * R, r[2] * R);
       if (!q){ o.el.style.opacity = 0; return; }
       o.el.style.transform = 'translate(' + q.x + 'px,' + q.y + 'px) translate(-50%,-50%)';
@@ -735,7 +729,7 @@ function mount(opts){
       paint();
       return;
     }
-    if (inChrome(e)){                       /* on the panel: let the field breathe again */
+    if (inChrome(e)){                       /* on the panel: let the field move again */
       if (hotCol){ hotCol = null; if (opts.onColumn) opts.onColumn(null); paint(); }
       return;
     }
@@ -768,17 +762,13 @@ function mount(opts){
     if (!still && !animating){               /* a tween paints its own frames */
       if (view === 'sphere'){
         yaw += locked ? motion * .0045 : IDLE_SPIN;
-        pos = scaled();
+        pos = scaled(); paint();
       } else if (view === 'timeline'){
-        if (Math.abs(scrollV) > .6){         /* coasting to a stop after a flick */
-          scrollX += scrollV; scrollV *= .93; pos = scaled();
-        } else if (locked && motion > 0){
-          /* only behind the cover, where nothing can be dragged, does the strip
-             run on its own — in the tool it moves when you move it */
-          scrollX += motion * 16; pos = scaled();
-        }
+        if (Math.abs(scrollV) > .6){ scrollX += scrollV; scrollV *= .93; }  /* a flick coasting out */
+        else scrollX += locked ? motion * 16 : TL_DRIFT;
+        pos = scaled(); paint();
       }
-      paint();                               /* every frame, so the breath shows */
+      /* nodes, clusters and grid move for nothing, so they ask for no frames */
     }
     requestAnimationFrame(frame);
   }

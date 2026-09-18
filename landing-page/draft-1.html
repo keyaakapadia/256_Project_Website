@@ -10,7 +10,7 @@
   #veil{position:fixed;inset:0;z-index:41000;background:var(--bg);transition:opacity .7s ease}
   #veil.gone{opacity:0;pointer-events:none}
 
-  #cover{position:fixed;inset:0;z-index:30000;display:grid;place-items:center;
+  #cover{position:fixed;inset:0;z-index:32000;display:grid;place-items:center;
          pointer-events:none;                      /* the field still turns underneath */
          /* heavy enough in the middle to carry type over a moving field —
             the views shuffle underneath and some of them are very busy */
@@ -57,7 +57,9 @@
   #cover.up .in > *:nth-child(5){transition-delay:.52s}
 
   /* ---- the panel it opens into ---- */
-  #side{position:fixed;left:0;top:0;bottom:0;width:322px;z-index:19500;overflow-y:auto;
+  /* above 30000: a held picture is 30000 and a hovered one 25000, and neither
+     may ever paint over the panel */
+  #side{position:fixed;left:0;top:0;bottom:0;width:322px;z-index:31000;overflow-y:auto;
         padding:24px 18px 26px;border-width:0 1px 0 0;border-radius:0;
         display:flex;flex-direction:column;
         transform:translateX(-100%);transition:transform .7s cubic-bezier(.22,.75,.28,1)}

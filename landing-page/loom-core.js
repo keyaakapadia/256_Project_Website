@@ -82,7 +82,11 @@ function order(sort){
 }
 
 /* ---------- the five shapes ---------- */
-const TL_CW = 360, TL_PER = 38, TL_RH = 420;        /* the endless strip's pitch */
+/* The strip's pitch IS the tile: TILE across, TILE * .8 down. Every gap is the
+   same because every gap is nothing — the run is one continuous woven surface
+   rather than rows with alleys between them. Fifty to a band gives three bands,
+   long and low, and a loop you can travel a long way down before it repeats. */
+const TL_PER = 50, TL_CW = 330, TL_RH = 264;
 const G_CW = 300, G_RH = 255, G_GAP = 170, G_WIDE = 2;
 const CL_CW = 275, CL_RH = 235, CL_GAP = 420, CL_VGAP = 560;
 
@@ -110,14 +114,12 @@ function layout(view, sort){
   }
 
   else if (view === 'timeline'){
-    /* an endless strip, four bands deep. Every band scrolls in lockstep and
-       wraps at the same width, so the loop never shows a seam; lightness gives
-       each picture a slow wave inside its band. */
+    /* an endless strip, three bands deep and edge to edge. Every band scrolls in
+       lockstep and wraps at the same width, so the loop never shows a seam. */
     const bands = Math.ceil(N / TL_PER);
     ord.forEach((i, k) => {
       const band = Math.floor(k / TL_PER), col = k % TL_PER;
-      out[i] = [(col - (TL_PER - 1) / 2) * TL_CW,
-                (band - (bands - 1) / 2) * TL_RH + (DATA[i].lit - 50) * 1.7, 0];
+      out[i] = [(col - (TL_PER - 1) / 2) * TL_CW, (band - (bands - 1) / 2) * TL_RH, 0];
     });
     runs.forEach(k => tag(k, { anchor: g[k][0] }));
     return { pos: out, columns: cols, loopW: TL_PER * TL_CW };
@@ -248,7 +250,7 @@ function mount(opts){
     const halfW = (innerWidth - inset.left - inset.right) / 2 - 34;
     const halfH = innerHeight / 2 - 54;   /* room for the column names above */
     let s;
-    if (view === 'timeline') s = .30;                      /* a fixed, comfortable tile */
+    if (view === 'timeline') s = .42;   /* no gaps to pay for, so the tile can be large */
     else if (view === 'sphere') s = Math.min(halfW, halfH) / (SR + TILE * .42);
     else {
       const e = raw.ext || [4000, 4000];

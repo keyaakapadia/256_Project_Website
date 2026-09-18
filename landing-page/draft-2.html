@@ -21,7 +21,9 @@
   #rail span{position:absolute;left:0;right:0;top:15%;text-align:center;font-size:10px;
              letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.42)}
 
-  #box{position:fixed;left:26px;bottom:26px;width:446px;z-index:19500;
+  /* above 30000: a held picture is 30000 and a hovered one 25000, and neither
+     may ever paint over the card */
+  #box{position:fixed;left:26px;bottom:26px;width:446px;z-index:31000;
        padding:17px 17px 15px;border-radius:12px;overflow:hidden;
        opacity:0;transform:translateY(16px);
        /* going back: unfold down first, then walk to the corner */

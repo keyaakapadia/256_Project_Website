@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loom — image mapping tool</title>
+<style>
+  :root{
+    --bg:#1b1b1b; --fg:#f5f4f1; --soft:#8d8a85; --line:rgba(255,255,255,.28); --hair:rgba(255,255,255,.13); --gold:#ffc23d;
+    --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:13px;
+       overflow:hidden;-webkit-font-smoothing:antialiased;cursor:grab}
+  body.drag{cursor:grabbing}
+  body.overline{cursor:pointer}
+
+  #wire{position:fixed;inset:0;pointer-events:none;z-index:19000}
+  #world{position:absolute;inset:0}
+  .node{position:absolute;will-change:transform;perspective:1600px}
+  .card{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;
+        transition:transform .62s cubic-bezier(.22,.75,.28,1)}
+  .node.flip .card{transform:rotateY(180deg)}
+  .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .back{transform:rotateY(180deg);background:#efece2;color:#17150f;padding:24px 26px;
+        display:flex;flex-direction:column;justify-content:center;cursor:pointer}
+  .back .t{font-size:17px;font-weight:500;line-height:1.26;margin-bottom:16px;letter-spacing:-.012em}
+  .back .r{display:flex;gap:14px;font-size:13px;padding:4px 0}
+  .back .r span{color:#8b8779;width:78px;flex:none}
+  .back .r b{font-weight:400;flex:1}
+  .back .k{margin-top:12px;padding-top:13px;border-top:1px solid rgba(0,0,0,.16)}
+  .bars{display:flex;flex-direction:column;gap:6px}
+  .brow{display:flex;align-items:center;gap:9px;font-size:11.5px}
+  .brow i{width:7px;height:7px;border-radius:50%;flex:none}
+  .brow u{width:70px;flex:none;text-decoration:none;text-transform:capitalize;color:#5c584d}
+  .btrack{flex:1;height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden}
+  .bfill{height:100%;border-radius:3px;transition:width .4s ease}
+  .brow b{width:16px;text-align:right;font-weight:500;font-variant-numeric:tabular-nums;color:#17150f}
+  .pie{display:flex;align-items:center;gap:14px;margin-top:14px}
+  .donut{border-radius:50%;position:relative;flex:none}
+  .donut::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#efece2}
+  .pien{display:flex;flex-direction:column;line-height:1.15}
+  .pien b{font-size:20px;font-weight:500}
+  .pien span{font-size:11px;color:#8b8779;letter-spacing:.06em;text-transform:uppercase}
+  .node img{display:block;width:100%;height:100%;object-fit:cover;background:#262626;
+            pointer-events:auto;cursor:pointer}
+  .node .wash{position:absolute;inset:0;opacity:.16;pointer-events:none;
+              transition:opacity .25s}
+  .node.held .wash{opacity:0}
+  .node.held{filter:drop-shadow(0 22px 60px rgba(0,0,0,.6))}
+
+  .label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;color:var(--soft);
+         letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+
+  /* ---- information: plain type, no outline, never pressable ---- */
+  #mark{padding:2px 4px 12px;pointer-events:none}
+  #mark b{display:block;font-size:16px;font-weight:500;letter-spacing:-.01em}
+  #mark span{font-size:11px;color:var(--soft)}
+
+  /* ---- controls: pressable reads through outline, fill and weight — never colour ---- */
+  .btn{font:inherit;color:var(--fg);background:transparent;border:1px solid var(--hair);
+       border-radius:5px;cursor:pointer;font-weight:500;
+       transition:border-color .15s,background .15s,color .15s}
+  .btn:hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
+  .btn.on{background:var(--fg);color:#141414;border-color:var(--fg)}
+
+  #dock{position:fixed;left:24px;bottom:24px;z-index:19500;padding:13px 13px 11px;width:428px}
+  .panel{background:rgba(21,21,21,.9);backdrop-filter:blur(18px);border-radius:10px;
+         border:1px solid rgba(255,255,255,.07);box-shadow:0 16px 44px rgba(0,0,0,.5)}
+
+  /* the five views as one segmented control, not five competing boxes */
+  #tabs{display:flex;flex-wrap:wrap;gap:2px;padding:3px;margin-bottom:12px;
+        background:rgba(255,255,255,.045);border-radius:8px}
+  #tabs.away{display:none}
+  #tabs .btn{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;
+             gap:6px;padding:7px 4px;font-size:11.5px;border:none;background:transparent;
+             border-radius:6px;color:var(--soft)}
+  #tabs .btn:hover{background:rgba(255,255,255,.06);color:var(--fg)}
+  #tabs .btn.on{background:var(--fg);color:#141414}
+  #tabs svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;
+            stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+  #key{padding:0}
+  #keyhead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;
+           padding:3px 2px 9px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+           border:none;background:none;color:var(--soft)}
+  #keyhead:hover{border:none;background:none;color:var(--fg)}
+  #keyhead b{font-weight:400;font-size:13px;line-height:1}
+  #keybody{overflow:hidden;transition:margin .28s ease,opacity .28s ease}
+  #key.shut #keybody{margin-top:0;height:0;opacity:0}
+
+  /* nine meanings, three by three — a grid, which is the point */
+  #klist{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+  .chip{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:11.5px;
+        text-align:left;border-radius:6px}
+  .chip i{width:7px;height:7px;border-radius:50%;flex:none}
+  .chip u{text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip s{text-decoration:none;font-weight:400;font-size:10px;opacity:.5;
+          font-variant-numeric:tabular-nums}
+  .chip.dim{opacity:.32}
+
+  .freq{margin-top:11px;padding-top:11px;border-top:1px solid rgba(255,255,255,.07);
+        display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .freq .lab{flex:none;width:74px;font-size:9.5px;letter-spacing:.14em;
+             text-transform:uppercase;color:var(--soft)}
+  #flist,#klind{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+  .fbtn{padding:5px 10px;font-size:11.5px;border-radius:5px}
+  .fbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
+  .kbtn.off{border-style:dashed;color:var(--soft);font-weight:400}
+
+  /* a reset is a quiet thing, not another button competing with the filters */
+  #clear{margin-top:10px;padding:3px 2px;font-size:11px;font-weight:400;border:none;
+         background:none;color:var(--soft);border-radius:0}
+  #clear:hover{border:none;background:none;color:var(--fg)}
+
+  /* ---- the way in ---- */
+  #entry{position:fixed;inset:0;z-index:40000;display:grid;place-items:center;
+         background:rgba(20,20,20,.64);backdrop-filter:blur(3px);transition:opacity .45s}
+  #entry.gone{opacity:0;pointer-events:none}
+  #entry .in{text-align:center}
+  #entry h1{margin:0;font-size:58px;font-weight:500;letter-spacing:-.03em}
+  #entry .sub{margin:10px 0 28px;font-size:16px;color:var(--soft)}
+  #entry .steps{display:flex;flex-direction:column;gap:9px;margin:0 0 30px;text-align:left;
+                max-width:340px}
+  #entry .steps div{display:flex;align-items:baseline;gap:12px;font-size:14px}
+  #entry .steps b{flex:none;width:16px;color:var(--soft);font-weight:400;font-size:12px}
+  #entry .btn{padding:11px 24px;font-size:14px}
+  #entry small{display:block;margin-top:20px;font-size:11px;color:var(--soft)}
+  /* everything in the way-in rises into place once the threads have settled */
+  #entry .in > *{opacity:0;transform:translateY(12px);
+                 transition:opacity .6s ease,transform .6s ease}
+  #entry.show .in > *{opacity:1;transform:none}
+  #entry.show .in > *:nth-child(1){transition-delay:.06s}
+  #entry.show .in > *:nth-child(2){transition-delay:.15s}
+  #entry.show .in > *:nth-child(3){transition-delay:.24s}
+  #entry.show .in > *:nth-child(4){transition-delay:.33s}
+  #entry.show .in > *:nth-child(5){transition-delay:.42s}
+
+  #boot{position:fixed;inset:0;z-index:41000;background:var(--bg);transition:opacity .9s ease}
+  #boot.gone{opacity:0;pointer-events:none}
+  #bootwire{position:absolute;inset:0;width:100%;height:100%}
+</style>
+</head>
+<body>
+
+<div id="world"></div>
+<canvas id="wire"></canvas>
+
+<div id="dock" class="panel">
+  <div id="mark"><b>Loom</b><span>image mapping tool</span></div>
+  <div id="tabs"></div>
+  <div id="key">
+    <button class="btn" id="keyhead">What connects them<b>–</b></button>
+    <div id="keybody">
+      <div id="klist"></div>
+      <div class="freq"><span class="lab">Similar by</span><div id="klind"></div></div>
+      <div class="freq"><span class="lab">Seen</span><div id="flist"></div></div>
+      <button class="btn" id="clear">Show everything</button>
+    </div>
+  </div>
+</div>
+
+<div id="entry" class="gone"><div class="in">
+  <h1>Loom</h1>
+  <p class="sub">150 grids, tied together by what they share.</p>
+  <div class="steps">
+    <div><b>1</b>Click any image to see its threads</div>
+    <div><b>2</b>Click a thread to follow it to the other end</div>
+    <div><b>3</b>Drag to look around · scroll to zoom in</div>
+  </div>
+  <button class="btn" id="start">Start</button>
+  <small>tagged by hand — point it at your own set</small>
+</div></div>
+
+<div id="boot"><canvas id="bootwire"></canvas></div>
+
+<script src="assets/loom.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   Loom — an image mapping tool.
+
+   Every picture carries one or two of nine things a grid can do.
+   A line joins two pictures that share something; its colour says
+   what, and a line that changes colour crossed from one meaning into
+   another. The views change where pictures sit. The lines never do.
+------------------------------------------------------------------ */
+
+const world = document.getElementById('world');
+const cv = document.getElementById('wire'), ctx = cv.getContext('2d');
+const TILE = META.tile, GOLD = META.gold, RS = META.sphereR;
+
+let view = 'sphere', focal = 1400, dist = META.views.sphere.dist, camX = 0, camY = 0;
+let yaw = 0.5, pitch = -0.2;
+let drag = false, lx = 0, ly = 0, downX = 0, downY = 0, moved = false, animating = false, anim = null;
+let hot = -1, pinned = -1, hotLine = -1, downIdx = -1, downFace = null;
+let only = null;
+const freqOn = new Set([0, 1, 2]);
+let panelWasOpen = true;
+
+/* ---------- relationships ---------- */
+const ADJ = DATA.map(() => []);
+META.edges.forEach(([a, b, kind, ma, mb]) => {
+  ADJ[a].push([b, kind, ma, mb]); ADJ[b].push([a, kind, mb, ma]);
+});
+const hasMeaning = (i, m) => DATA[i].means.includes(m);
+const kindOn = new Set(['meaning']);                 /* only Meaning finds kin by default */
+const live = i => (!only || hasMeaning(i, only)) && freqOn.has(DATA[i].fb);
+function edgeOk(a, b, kind, ma, mb){
+  if (!kindOn.has(kind)) return false;
+  if (!freqOn.has(DATA[a].fb) || !freqOn.has(DATA[b].fb)) return false;
+  if (only){
+    const touches = kind === 'meaning' ? (ma === only || mb === only) : (hasMeaning(a, only) || hasMeaning(b, only));
+    if (!touches) return false;
+  }
+  return true;
+}
+const linksOf = i => ADJ[i].filter(([j, kind, ma, mb]) => edgeOk(i, j, kind, ma, mb));
+
+/* ---------- the sphere: around is what it does, top to bottom is how often ---------- */
+function rot(u){
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const x = u[0] * cy + u[2] * sy, z1 = -u[0] * sy + u[2] * cy;
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  return [x, u[1] * cp - z1 * sp, u[1] * sp + z1 * cp];
+}
+const sphereAll = () => DATA.map(d => { const r = rot(d.sph); return [r[0] * RS, r[1] * RS, r[2] * RS]; });
+const baseAll = v => v === 'sphere' ? sphereAll() : DATA.map(d => d[v].slice());
+
+let pos = baseAll(view), P = [], segs = [];
+
+/* ---------- holding a picture ---------- */
+function buildFocus(i){
+  const ln = linksOf(i), base = baseAll(view), out = base.map(p => p.slice());
+  out[i] = [0, 0, 0];
+  const R0 = dist * 0.26, RING = dist * 0.115;   /* constant on screen, whatever the view */
+  ln.forEach(([j], k) => {
+    const ring = Math.floor(k / 12), inRing = k % 12, per = Math.min(12, ln.length - ring * 12);
+    const a = (inRing / per) * Math.PI * 2 - Math.PI / 2 + ring * 0.26;
+    const r = R0 + ring * RING;
+    out[j] = [Math.cos(a) * r * 1.45, Math.sin(a) * r, 0];
+  });
+  const kin = new Set(ln.map(([j]) => j));
+  base.forEach((p, j) => {                       /* everything else drifts to the rim */
+    if (j === i || kin.has(j)) return;
+    const d = Math.hypot(p[0], p[1]) || 1;
+    out[j] = [p[0] / d * dist * 0.85, p[1] / d * dist * 0.85, p[2] * 0.3];
+  });
+  return out;
+}
+function easeTo(target, T = 700, done){
+  const from = pos.map(p => p.slice()), t0 = performance.now();
+  cancelAnimationFrame(anim);
+  (function step(now){
+    const u = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - u, 3);
+    pos = from.map((p, i) => [p[0] + (target[i][0] - p[0]) * e,
+                              p[1] + (target[i][1] - p[1]) * e,
+                              p[2] + (target[i][2] - p[2]) * e]);
+    paint();
+    if (u < 1) anim = requestAnimationFrame(step);
+  })(t0);
+  setTimeout(() => { pos = done ? done() : target.map(p => p.slice()); paint(); }, T + 60);
+}
+const key = document.getElementById('key');
+const setSign = () => { key.querySelector('#keyhead b').textContent = key.classList.contains('shut') ? '+' : '–'; };
+function hold(i){
+  if (pinned < 0) panelWasOpen = !key.classList.contains('shut');
+  pinned = i; camX = camY = 0;
+  tabs.classList.add('away');                    /* inside a picture, the views are not the point */
+  key.classList.remove('shut'); setSign();       /* what connects it is */
+  easeTo(buildFocus(i));
+  paint();
+}
+function release(){
+  if (pinned < 0) return;
+  pinned = -1;
+  tabs.classList.remove('away');
+  key.classList.toggle('shut', !panelWasOpen);
+  setSign();
+  easeTo(baseAll(view), 700, () => baseAll(view));
+  paint();
+}
+
+/* ---------- pictures ---------- */
+const nodes = DATA.map((d, i) => {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.innerHTML =
+    `<div class="card">
+       <div class="face front"><img src="${THUMB(d.thumb)}" alt="">
+         <div class="wash" style="background:${META.mcol[d.means[0]]}"></div></div>
+       <div class="face back"></div>
+     </div>`;
+  const front = el.querySelector('.front');
+  front.addEventListener('mouseenter', () => { hot = i; paint(); });
+  front.addEventListener('mouseleave', () => { hot = -1; paint(); });
+  front.addEventListener('mousedown', e => { e.stopPropagation(); downIdx = i; downFace = 'front'; });
+  el.querySelector('.back').addEventListener('mousedown', e => { e.stopPropagation(); downIdx = i; downFace = 'back'; });
+  el.__i = i;
+  world.appendChild(el);
+  return el;
+});
+
+/* ---------- words that live in the space ---------- */
+function mkLabel(text, color){
+  const el = document.createElement('div');
+  el.className = 'label'; el.textContent = text;
+  if (color) el.style.color = color;
+  world.appendChild(el);
+  return el;
+}
+const placeLabels = META.places.map(p => ({ el: mkLabel(p), at: META.placeAt[p] }));
+const gridLabels  = META.meanings.map(m => ({ el: mkLabel(m, META.mcol[m]), x: META.gridHeads[m] }));
+const poleLabels  = [['seen every day', [0, -1, 0]], ['seen rarely', [0, 1, 0]]]
+  .map(([t, u]) => ({ el: mkLabel(t), u }));
+
+function project(x, y, z){
+  const d = z + dist;
+  if (d < 90) return null;
+  const s = focal / d;
+  return { x: innerWidth / 2 + (x - camX) * s, y: innerHeight / 2 + (y - camY) * s, s, d };
+}
+const rgba = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`; };
+function grad(pa, pb, ca, cb, alpha){
+  if (ca === cb) return rgba(ca, alpha);
+  const g = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
+  g.addColorStop(0, rgba(ca, alpha)); g.addColorStop(1, rgba(cb, alpha));
+  return g;
+}
+function edgeColor(a, b, kind, ma, mb){
+  if (kind === 'meaning') return [META.mcol[ma], META.mcol[mb]];
+  if (kind === 'color')   return [DATA[a].hex, DATA[b].hex];      /* the pictures' own colours */
+  return [META.kindColor[kind], META.kindColor[kind]];            /* theme / composition: one quiet tone */
+}
+function stroke(pa, pb, a, b, kind, ma, mb, alpha){
+  const [ca, cb] = edgeColor(a, b, kind, ma, mb);
+  return grad(pa, pb, ca, cb, alpha);
+}
+const last = new Map();
+function put(el, k, v){                    /* only touch the DOM when it changes */
+  const key2 = el.__i + ':' + k;
+  if (last.get(key2) === v) return;
+  last.set(key2, v); el.style[k] = v;
+}
+
+/* ---------- line shapes ---------- */
+function arcPts(ia, ib, steps = 14){        /* great circle along the sphere's surface */
+  const a = rot(DATA[ia].sph), b = rot(DATA[ib].sph);
+  const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+  const om = Math.acos(dot), so = Math.sin(om);
+  const pts = []; let zs = 0;
+  for (let k = 0; k <= steps; k++){
+    const t = k / steps;
+    const s1 = so < 1e-4 ? 1 - t : Math.sin((1 - t) * om) / so;
+    const s2 = so < 1e-4 ? t : Math.sin(t * om) / so;
+    const x = a[0] * s1 + b[0] * s2, y = a[1] * s1 + b[1] * s2, z = a[2] * s1 + b[2] * s2;
+    const q = project(x * RS, y * RS, z * RS);
+    if (!q) return null;
+    pts.push(q); zs += z;
+  }
+  pts.back = zs / (steps + 1) > 0.05;
+  return pts;
+}
+function fanPts(a, b, k, steps = 16){        /* a held picture's links, fanned into a spray */
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+  const bow = Math.min(120, L * 0.17) * (k % 2 ? 1 : -1);
+  const cx = mx - dy / L * bow, cy = my + dx / L * bow, pts = [];
+  for (let s = 0; s <= steps; s++){
+    const t = s / steps, u = 1 - t;
+    pts.push({ x: u * u * a.x + 2 * u * t * cx + t * t * b.x, y: u * u * a.y + 2 * u * t * cy + t * t * b.y });
+  }
+  return pts;
+}
+function drawPoly(pts){
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
+  ctx.stroke();
+}
+
+/* ---------- draw ---------- */
+function paint(){
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+  P = pos.map(p => project(p[0], p[1], p[2]));
+  const focusI = pinned >= 0 ? pinned : hot;
+  const ln = focusI >= 0 ? linksOf(focusI) : [];
+  const kin = new Set(ln.map(([j]) => j));
+  const globe = view === 'sphere' && pinned < 0 && !animating;
+  const shrink = view === 'sphere' && pinned < 0 ? 0.72 : 1;
+
+  DATA.map((_, i) => i).filter(i => P[i]).sort((a, b) => P[b].d - P[a].d).forEach(i => {
+    const p = P[i], el = nodes[i], held = i === pinned;
+    const far = globe && pos[i][2] > 0;          /* the far side of the sphere */
+    const big = i === focusI ? 1.25 + 0.75 * (DATA[i].deg / META.maxdeg) : 1;
+    let w = TILE * p.s * big * shrink, h = w * .8;
+    if (held){ h = Math.min(innerHeight * .40, 430); w = h / .82; }
+    else if (pinned >= 0 && kin.has(i)){         /* ringed kin come forward too */
+      const floor = Math.min(innerHeight * .15, 150);
+      if (h < floor){ h = floor; w = h / .8; }
+    }
+    put(el, 'transform', `translate(${Math.round(p.x - w / 2)}px,${Math.round(p.y - h / 2)}px)`);
+    put(el, 'width', Math.round(w) + 'px'); put(el, 'height', Math.round(h) + 'px');
+    el.classList.toggle('held', held);
+    const flip = held && hot === i;
+    el.classList.toggle('flip', flip);
+    if (flip) fillBack(el, i, ln);
+    put(el, 'opacity', String(!live(i) ? .08
+      : focusI < 0 ? (far ? .3 : 1)
+      : (i === focusI ? 1 : kin.has(i) ? .95 : far ? .1 : .24)));
+    const zi = held ? 30000 : i === focusI ? 25000 : (pinned >= 0 && kin.has(i) ? 20000
+      /* NEVER negative. A child with a negative z-index paints behind its own
+         positioned parent, which puts #world on top of every picture and makes
+         all 150 of them unhittable — no hover, no click, in any view. Depth
+         still orders them; they just sit under #wire (19000) instead of under
+         the world, so the lines still draw over them exactly as before. */
+      : Math.max(1, 19000 - Math.round(p.d / 4)));
+    put(el, 'zIndex', String(zi));
+    el.classList.toggle('front', i === focusI);
+  });
+
+  /* the resting lines — quiet, but the field is never empty */
+  ctx.lineWidth = 1.4;
+  META.edges.forEach(([a, b, kind, ma, mb]) => {
+    if (!edgeOk(a, b, kind, ma, mb)) return;
+    let pts;
+    if (globe){ pts = arcPts(a, b); if (!pts) return; }
+    else { if (!P[a] || !P[b]) return; pts = [P[a], P[b]]; }
+    const base = (focusI < 0 ? .34 : .07) * (kind === 'meaning' ? 1 : .8);
+    ctx.strokeStyle = stroke(pts[0], pts[pts.length - 1], a, b, kind, ma, mb, pts.back ? base * .3 : base);
+    drawPoly(pts);
+  });
+
+  /* the lines of the picture in hand */
+  segs = [];
+  if (focusI >= 0 && live(focusI) && P[focusI]){
+    ln.forEach(([j, kind, ma, mb], k) => {
+      if (!P[j] || !live(j)) return;
+      let pts;
+      if (pinned >= 0) pts = fanPts(P[focusI], P[j], k);
+      else if (globe) pts = arcPts(focusI, j) || [P[focusI], P[j]];
+      else pts = [P[focusI], P[j]];
+      segs.push({ pts, j, kind, ma, mb, b: P[j] });
+    });
+    segs.forEach((sg, k) => {
+      const on = k === hotLine;
+      ctx.strokeStyle = on ? GOLD
+        : stroke(sg.pts[0], sg.pts[sg.pts.length - 1], focusI, sg.j, sg.kind, sg.ma, sg.mb, .9);
+      ctx.lineWidth = on ? 3.4 : 2;
+      drawPoly(sg.pts);
+    });
+    if (hotLine >= 0 && segs[hotLine]){
+      const t = segs[hotLine].b;
+      ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+      ctx.strokeRect(t.x - TILE * t.s / 2 - 4, t.y - TILE * t.s * .4 - 4,
+                     TILE * t.s + 8, TILE * t.s * .8 + 8);
+    }
+  }
+
+  /* words in the space */
+  const setL = (el, q, op, fs) => {
+    if (!q){ el.style.opacity = 0; return; }
+    el.style.transform = `translate(${q.x}px,${q.y}px) translate(-50%,-50%)`;
+    el.style.opacity = op; el.style.fontSize = fs + 'px';
+  };
+  const dim = focusI < 0 ? 1 : .3;
+  placeLabels.forEach(o => {
+    if (view !== 'places' || animating || pinned >= 0){ o.el.style.opacity = 0; return; }
+    const q = project(o.at[0], o.at[1], 0);
+    setL(o.el, q, .85 * dim, q ? Math.max(9, Math.min(15, 11 * q.s * 1.4)) : 0);
+  });
+  gridLabels.forEach(o => {
+    if (view !== 'grid' || animating || pinned >= 0){ o.el.style.opacity = 0; return; }
+    const q = project(o.x, META.gridTop, 0);
+    setL(o.el, q, .85 * dim, q ? Math.max(9, Math.min(15, 11 * q.s * 1.5)) : 0);
+  });
+  poleLabels.forEach(o => {
+    if (!globe){ o.el.style.opacity = 0; return; }
+    const r = rot(o.u), q = project(r[0] * RS * 1.16, r[1] * RS * 1.16, r[2] * RS * 1.16);
+    setL(o.el, q, (r[2] > .35 ? .15 : .75) * dim, 11);
+  });
+}
+
+function donut(slices, total, size){
+  let acc = 0, stops = [];
+  slices.forEach(([color, n]) => {
+    const a0 = acc / total * 360, a1 = (acc + n) / total * 360;
+    stops.push(`${color} ${a0.toFixed(1)}deg ${a1.toFixed(1)}deg`);
+    acc += n;
+  });
+  const bg = stops.length ? `conic-gradient(${stops.join(',')})` : 'var(--line)';
+  return `<div class="donut" style="width:${size}px;height:${size}px;background:${bg}"></div>`;
+}
+function fillBack(el, i, ln){
+  const d = DATA[i], by = {}, order = [];
+  ln.forEach(([, kind, , mb]) => {
+    const key = kind === 'meaning' ? mb : kind;
+    const label = kind === 'meaning' ? mb : META.kindLabel[kind];
+    const color = kind === 'meaning' ? META.mcol[mb] : (kind === 'color' ? d.hex : META.kindColor[kind]);
+    if (!by[key]) { by[key] = { n: 0, label, color }; order.push(key); }
+    by[key].n++;
+  });
+  order.sort((a, b) => by[b].n - by[a].n);
+  const slices = order.map(k => [by[k].color, by[k].n]);
+  const max = order.length ? by[order[0]].n : 1;
+  const bars = order.map(k => {
+    const row = by[k];
+    return `<div class="brow"><i style="background:${row.color}"></i><u>${row.label}</u>
+      <div class="btrack"><div class="bfill" style="width:${Math.round(row.n / max * 100)}%;background:${row.color}"></div></div>
+      <b>${row.n}</b></div>`;
+  }).join('');
+  el.querySelector('.back').innerHTML =
+    `<div class="t">${d.title}</div>
+     <div class="r"><span>Does</span><b>${d.means.map(m =>
+        `<span style="color:${META.mcol[m]}">${m}</span>`).join(' + ')}</b></div>
+     <div class="r"><span>Found in</span><b>${d.place}</b></div>
+     <div class="r"><span>Seen</span><b>${META.freqBuckets[d.fb]}</b></div>
+     <div class="pie">
+       ${ln.length ? donut(slices, ln.length, 56) : ''}
+       <div class="pien"><b>${ln.length}</b><span>joined</span></div>
+     </div>
+     <div class="k">${bars || '<span style="color:#8b8779;font-size:12px">nothing else shares this yet</span>'}</div>`;
+}
+
+/* ---------- following a line ---------- */
+function nearestSeg(mx, my){
+  let best = -1, bd = 9;
+  segs.forEach((s, k) => {
+    const pts = s.pts;
+    const first = pts.length === 2 ? 0 : Math.floor((pts.length - 1) * 0.14);
+    for (let n = first; n < pts.length - 1; n++){
+      const a = pts[n], b = pts[n + 1], dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy;
+      if (!L) continue;
+      let t = ((mx - a.x) * dx + (my - a.y) * dy) / L;
+      t = pts.length === 2 ? Math.max(.14, Math.min(1, t)) : Math.max(0, Math.min(1, t));
+      const d = Math.hypot(mx - (a.x + dx * t), my - (a.y + dy * t));
+      if (d < bd){ bd = d; best = k; }
+    }
+  });
+  return best;
+}
+addEventListener('mousemove', e => {
+  if (drag || segs.length === 0) return;
+  const k = nearestSeg(e.clientX, e.clientY);
+  if (k !== hotLine){ hotLine = k; document.body.classList.toggle('overline', k >= 0); paint(); }
+});
+/* ---------- views ---------- */
+function goto(v){
+  if (pinned >= 0){ pinned = -1; tabs.classList.remove('away');
+                    key.classList.toggle('shut', !panelWasOpen); setSign(); }
+  view = v; dist = META.views[v].dist; camX = 0; camY = 0;
+  const from = pos.map(p => p.slice()), to = baseAll(v), t0 = performance.now(), T = 950;
+  animating = true; cancelAnimationFrame(anim);
+  (function step(now){
+    const u = Math.min(1, (now - t0) / T);
+    const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    pos = from.map((p, i) => [p[0] + (to[i][0] - p[0]) * e, p[1] + (to[i][1] - p[1]) * e,
+                              p[2] + (to[i][2] - p[2]) * e]);
+    paint();
+    if (u < 1) anim = requestAnimationFrame(step);
+  })(t0);
+  setTimeout(() => { animating = false; pos = baseAll(v); paint(); }, T + 60);
+}
+
+const ICON = {
+  nodes:  '<circle cx="5" cy="6" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="9" cy="11" r="1.6"/><circle cx="16" cy="13" r="1.6"/><circle cx="4" cy="15" r="1.6"/>',
+  web:    '<circle cx="10" cy="10" r="2"/><circle cx="4" cy="4.5" r="1.5"/><circle cx="16" cy="5" r="1.5"/><circle cx="4.5" cy="16" r="1.5"/><circle cx="16" cy="15.5" r="1.5"/><path d="M8.6 8.6 5.1 5.6M11.5 8.7 14.7 6M8.7 11.5 5.7 14.7M11.5 11.4 14.7 14.3"/>',
+  places: '<path d="M10 17s6-5.1 6-9.4A6 6 0 0 0 4 7.6C4 11.9 10 17 10 17z"/><circle cx="10" cy="7.4" r="2.1"/>',
+  grid:   '<rect x="3" y="3" width="5.5" height="5.5"/><rect x="11.5" y="3" width="5.5" height="5.5"/><rect x="3" y="11.5" width="5.5" height="5.5"/><rect x="11.5" y="11.5" width="5.5" height="5.5"/>',
+  sphere: '<circle cx="10" cy="10" r="7"/><ellipse cx="10" cy="10" rx="3.2" ry="7"/><path d="M3 10h14"/>'
+};
+const tabs = document.getElementById('tabs');
+tabs.innerHTML = META.viewOrder.map(v =>
+  `<button class="btn ${v === view ? 'on' : ''}" data-v="${v}">
+     <svg viewBox="0 0 20 20">${ICON[v]}</svg>${META.views[v].label}</button>`).join('');
+tabs.querySelectorAll('.btn').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  tabs.querySelectorAll('.btn').forEach(o => o.classList.toggle('on', o === b));
+  goto(b.dataset.v);
+});
+
+/* ---------- filters ---------- */
+const klist = document.getElementById('klist');
+klist.innerHTML = META.meanings.map(m =>
+  `<button class="btn chip" data-m="${m}"><i style="background:${META.mcol[m]}"></i>
+     <u>${m}</u><s>${META.mcount[m]}</s></button>`).join('');
+function syncChips(){
+  klist.querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('on', c.dataset.m === only);
+    c.classList.toggle('dim', !!only && c.dataset.m !== only);
+  });
+}
+klist.querySelectorAll('.chip').forEach(c => c.onclick = e => {
+  e.stopPropagation();
+  only = only === c.dataset.m ? null : c.dataset.m;
+  syncChips(); paint();
+});
+
+const klind = document.getElementById('klind');
+klind.innerHTML = META.kinds.map(k =>
+  `<button class="btn fbtn" data-k="${k}">${META.kindLabel[k]}</button>`).join('');
+const syncKind = () => klind.querySelectorAll('.fbtn')
+  .forEach(b => b.classList.toggle('off', !kindOn.has(b.dataset.k)));
+klind.querySelectorAll('.fbtn').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  const k = b.dataset.k;
+  if (kindOn.has(k)){ if (kindOn.size > 1) kindOn.delete(k); } else kindOn.add(k);
+  syncKind(); paint();
+});
+
+const flist = document.getElementById('flist');
+flist.innerHTML = META.freqBuckets.map((f, k) => `<button class="btn fbtn" data-f="${k}">${f}</button>`).join('');
+const syncFreq = () => flist.querySelectorAll('.fbtn')
+  .forEach(b => b.classList.toggle('off', !freqOn.has(+b.dataset.f)));
+flist.querySelectorAll('.fbtn').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  const k = +b.dataset.f;
+  if (freqOn.has(k)){ if (freqOn.size > 1) freqOn.delete(k); } else freqOn.add(k);
+  syncFreq(); paint();
+});
+document.getElementById('clear').onclick = e => {
+  e.stopPropagation();
+  only = null; [0, 1, 2].forEach(k => freqOn.add(k));
+  kindOn.clear(); kindOn.add('meaning');
+  syncChips(); syncFreq(); syncKind(); paint();
+};
+document.getElementById('keyhead').onclick = e => {
+  e.stopPropagation();
+  key.classList.toggle('shut'); setSign();
+};
+
+/* ---------- moving about ---------- */
+addEventListener('mousedown', e => {
+  if (e.target?.closest?.('#dock, #entry')) return;
+  downIdx = -1; downFace = null;          /* a node's own mousedown handler sets these, if any */
+  drag = true; moved = false; lx = e.clientX; ly = e.clientY; downX = e.clientX; downY = e.clientY;
+  document.body.classList.add('drag');
+}, true);                                  /* capture: runs before the node's own mousedown */
+addEventListener('mouseup', e => {
+  drag = false; document.body.classList.remove('drag');
+  if (moved || e.target?.closest?.('#dock, #entry')) return;
+  if (downFace === 'back'){ release(); return; }
+  /* whatever is hovered right now wins — growth-on-hover can shift a picture's
+     box between mousedown and mouseup, so trust the live hover state over
+     whichever element happened to be under the very first pixel of the click */
+  const target = hot >= 0 ? hot : downIdx;
+  if (target >= 0){
+    pinned === target ? release() : hold(target);
+    return;
+  }
+  if (hotLine >= 0 && segs[hotLine]){
+    const j = segs[hotLine].j;
+    hotLine = -1; document.body.classList.remove('overline');
+    hold(j); return;
+  }
+  if (pinned >= 0) release();
+});
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  const dx = e.clientX - lx, dy = e.clientY - ly;
+  /* click vs. drag: measure total travel from mousedown, not the last move event —
+     a real mouse or trackpad jitters a few px even on a still click */
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) moved = true;
+  lx = e.clientX; ly = e.clientY;
+  if (view === 'sphere' && pinned < 0 && !animating){     /* the sphere turns; everything else pans */
+    yaw += dx * 0.005;
+    pitch = Math.max(-1.25, Math.min(1.25, pitch + dy * 0.004));
+    pos = sphereAll();
+  } else {
+    const s = focal / dist;
+    camX -= dx / s; camY -= dy / s;
+  }
+  paint();
+});
+addEventListener('wheel', e => {
+  if (e.target?.closest?.('#dock')) return;
+  e.preventDefault();
+  dist = Math.max(700, Math.min(12000, dist * (e.deltaY > 0 ? 1.075 : .93)));
+  paint();
+}, { passive: false });
+addEventListener('resize', paint);
+
+/* ---------- the way in ---------- */
+const entry = document.getElementById('entry');
+const enter = () => entry.classList.add('gone');
+document.getElementById('start').onclick = e => { e.stopPropagation(); enter(); };
+entry.addEventListener('click', e => { e.stopPropagation(); enter(); });
+addEventListener('keydown', enter);
+
+/* ---------- the way in draws itself ----------
+   Instead of counting files, the introduction stitches itself: threads in the
+   meanings' own colours, each easing out from nothing, quickly but smoothly.
+   When the pictures are ready the whole cloth dissolves into the background
+   and the title rises through it. ------------------------------------------ */
+const bootEl = document.getElementById('boot');
+const bcv = document.getElementById('bootwire'), bcx = bcv.getContext('2d');
+const BOOT_MS = 2200;
+const bootRGBA = (hex, a) => { const v = parseInt(hex.slice(1), 16);
+  return 'rgba(' + (v >> 16 & 255) + ',' + (v >> 8 & 255) + ',' + (v & 255) + ',' + a + ')'; };
+
+const bootCols = META.meanings.map(m => META.mcol[m]);
+
+/* points spread over the WHOLE screen, on a loose lattice — the grid the
+   threads get strung across */
+function bootLattice(cols, rows, jitter){
+  const out = [];
+  for (let cx = 0; cx < cols; cx++)
+    for (let cy = 0; cy < rows; cy++)
+      out.push({ x: (cx + .5) / cols + (Math.random() - .5) * jitter / cols,
+                 y: (cy + .5) / rows + (Math.random() - .5) * jitter / rows });
+  return out;
+}
+const bootPts = bootLattice(11, 7, 1.5);
+const hazePts = bootLattice(14, 9, 1.6);
+
+function bootThreads(pts, n, delaySpan, alpha){
+  const out = [];
+  for (let i = 0; i < n; i++){
+    const a = pts[(Math.random() * pts.length) | 0];
+    let b = pts[(Math.random() * pts.length) | 0];
+    for (let k = 0; k < 3; k++){            /* prefer a nearer partner, so it reads
+                                               as woven rather than as noise */
+      const c = pts[(Math.random() * pts.length) | 0];
+      if (Math.hypot(c.x - a.x, c.y - a.y) < Math.hypot(b.x - a.x, b.y - a.y)) b = c;
+    }
+    if (a === b) continue;
+    out.push({ a, b, alpha,
+      ca: bootCols[(Math.random() * bootCols.length) | 0],
+      cb: bootCols[(Math.random() * bootCols.length) | 0],
+      t0: Math.random() * delaySpan, dur: 420 + Math.random() * 380 });
+  }
+  return out;
+}
+const haze    = bootThreads(hazePts, 96, BOOT_MS * .54, .13);
+const threads = bootThreads(bootPts, 130, BOOT_MS * .46, .34);   /* .34 = the tool's own resting alpha */
+
+function bootSize(){
+  const d = Math.min(2, devicePixelRatio || 1);
+  bcv.width = innerWidth * d; bcv.height = innerHeight * d;
+  bcx.setTransform(d, 0, 0, d, 0, 0);
+}
+bootSize();
+addEventListener('resize', bootSize);
+
+const bootEase = t => 1 - Math.pow(1 - t, 3);
+const bootStart = performance.now();
+let bootDone = false;
+
+function bootFrame(now){
+  const el = now - bootStart, W = innerWidth, H = innerHeight;
+  bcx.clearRect(0, 0, W, H);
+  bcx.lineCap = 'round';
+
+  const run = (set, lw) => {
+    bcx.lineWidth = lw;
+    set.forEach(t => {
+      const p = bootEase(Math.max(0, Math.min(1, (el - t.t0) / t.dur)));
+      if (p <= 0) return;
+      const ax = t.a.x * W, ay = t.a.y * H;
+      const bx2 = t.b.x * W, by2 = t.b.y * H;
+      const g = bcx.createLinearGradient(ax, ay, bx2, by2);
+      g.addColorStop(0, bootRGBA(t.ca, t.alpha)); g.addColorStop(1, bootRGBA(t.cb, t.alpha));
+      bcx.strokeStyle = g;
+      bcx.beginPath(); bcx.moveTo(ax, ay);
+      bcx.lineTo(ax + (bx2 - ax) * p, ay + (by2 - ay) * p); bcx.stroke();
+    });
+  };
+  run(haze, 1.0);
+  run(threads, 1.4);   /* 1.4 = the tool's own resting line width */
+
+  if (!bootDone) requestAnimationFrame(bootFrame);
+}
+requestAnimationFrame(bootFrame);
+
+let loaded = 0;
+function maybeEnter(){
+  if (bootDone || loaded < DATA.length) return;
+  if (performance.now() - bootStart < BOOT_MS){ setTimeout(maybeEnter, 90); return; }
+  bootDone = true;
+  paint();
+  bootEl.classList.add('gone');          /* the cloth blends into the background */
+  entry.classList.remove('gone');
+  requestAnimationFrame(() => entry.classList.add('show'));   /* the title comes forward */
+}
+world.querySelectorAll('img').forEach(img => {
+  const tick = () => { loaded++; maybeEnter(); };
+  img.complete ? tick() : (img.onload = tick, img.onerror = tick);
+});
+maybeEnter();
+syncFreq(); syncKind();
+paint();
+</script>
+</body>
+</html>
